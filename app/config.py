@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     min_free_disk_percent: float = 10.0  # start deleting oldest files below this
     retention_check_interval_seconds: int = 60
 
+    # Thumbnails (used to scrub recordings on a timeline). Extracted from
+    # finished recording segments, not a live camera connection, so they
+    # cost no extra bandwidth to the camera.
+    thumbnail_interval_seconds: int = 60  # default cadence, overridable per camera
+    thumbnail_check_interval_seconds: int = 30
+
     # Live streaming (HLS)
     hls_segment_seconds: int = 2
     hls_list_size: int = 6
@@ -55,11 +61,15 @@ class Settings(BaseSettings):
         return self.data_dir / "hls"
 
     @property
+    def thumbnails_dir(self) -> Path:
+        return self.data_dir / "thumbnails"
+
+    @property
     def secret_key_file(self) -> Path:
         return self.config_dir / "secret_key"
 
     def ensure_dirs(self) -> None:
-        for d in (self.data_dir, self.config_dir, self.recordings_dir, self.hls_dir):
+        for d in (self.data_dir, self.config_dir, self.recordings_dir, self.hls_dir, self.thumbnails_dir):
             d.mkdir(parents=True, exist_ok=True)
 
     def resolve_secret_key(self) -> str:

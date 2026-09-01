@@ -15,6 +15,7 @@ from app.ffmpeg_manager import StreamManager
 from app.ptz_registry import PTZRegistry
 from app.retention import retention_loop
 from app.store import CameraStore
+from app.thumbnails import thumbnail_loop
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -37,12 +38,14 @@ async def lifespan(app: FastAPI):
     stop_event = asyncio.Event()
     app.state.retention_stop_event = stop_event
     retention_task = asyncio.create_task(retention_loop(settings, stop_event))
+    thumbnail_task = asyncio.create_task(thumbnail_loop(settings, app.state.store, stop_event))
 
     try:
         yield
     finally:
         stop_event.set()
         await retention_task
+        await thumbnail_task
         await app.state.stream_manager.stop_all()
 
 

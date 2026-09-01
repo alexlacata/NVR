@@ -1,6 +1,7 @@
-"""Keeps recordings from filling up the disk: deletes files older than
-`retention_days`, and if free space still falls below `min_free_disk_percent`,
-deletes the oldest remaining recordings (across all cameras) until it doesn't.
+"""Keeps recordings (and their thumbnails) from filling up the disk:
+deletes files older than `retention_days`, and if free space still falls
+below `min_free_disk_percent`, deletes the oldest remaining files (across
+all cameras) until it doesn't.
 """
 from __future__ import annotations
 
@@ -23,14 +24,20 @@ class RetentionReport:
     reason: str = ""
 
 
-def _iter_recording_files(recordings_dir: Path):
-    if not recordings_dir.exists():
+def _iter_files(base_dir: Path, pattern: str):
+    if not base_dir.exists():
         return
-    for camera_dir in recordings_dir.iterdir():
+    for camera_dir in base_dir.iterdir():
         if not camera_dir.is_dir():
             continue
-        for f in camera_dir.glob("*.mp4"):
+        for f in camera_dir.glob(pattern):
             yield f
+
+
+def _managed_files(settings: Settings):
+    yield from _iter_files(settings.recordings_dir, "*.mp4")
+    yield from _iter_files(settings.thumbnails_dir, "*.jpg")
+    yield from _iter_files(settings.thumbnails_dir, ".done-*")  # per-segment "processed" markers
 
 
 def enforce_retention(settings: Settings) -> RetentionReport:
@@ -38,7 +45,7 @@ def enforce_retention(settings: Settings) -> RetentionReport:
     now = time.time()
     max_age = settings.retention_days * 86400
 
-    for f in list(_iter_recording_files(settings.recordings_dir)):
+    for f in list(_managed_files(settings)):
         try:
             age = now - f.stat().st_mtime
         except OSError:
@@ -55,10 +62,7 @@ def enforce_retention(settings: Settings) -> RetentionReport:
     if free_percent >= settings.min_free_disk_percent:
         return report
 
-    files = sorted(
-        _iter_recording_files(settings.recordings_dir),
-        key=lambda p: _safe_mtime(p),
-    )
+    files = sorted(_managed_files(settings), key=lambda p: _safe_mtime(p))
     for f in files:
         usage = shutil.disk_usage(settings.data_dir)
         free_percent = 100.0 * usage.free / usage.total if usage.total else 100.0

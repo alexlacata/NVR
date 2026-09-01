@@ -51,6 +51,10 @@ class CameraBase(BaseModel):
     onvif_username: Optional[str] = Field(default=None, max_length=200)
     onvif_password: Optional[str] = Field(default=None, max_length=200)
 
+    # How often a thumbnail is extracted from this camera's recordings, for
+    # the playback timeline. None = use the server-wide default.
+    thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
+
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str, info) -> str:
@@ -115,6 +119,7 @@ class CameraUpdate(BaseModel):
     onvif_url: Optional[str] = Field(default=None, max_length=2000)
     onvif_username: Optional[str] = Field(default=None, max_length=200)
     onvif_password: Optional[str] = Field(default=None, max_length=200)
+    thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
 
 
 class Camera(CameraBase):

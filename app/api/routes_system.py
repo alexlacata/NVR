@@ -21,4 +21,6 @@ def system_info(settings: Settings = Depends(get_settings)):
         "retention_days": settings.retention_days,
         "min_free_disk_percent": settings.min_free_disk_percent,
         "data_dir": str(settings.data_dir),
+        "segment_seconds": settings.segment_seconds,
+        "thumbnail_interval_seconds": settings.thumbnail_interval_seconds,
     }

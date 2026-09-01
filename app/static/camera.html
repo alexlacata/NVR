@@ -26,6 +26,17 @@
     <button class="btn secondary" id="btn-today">Aujourd'hui</button>
     <button class="btn secondary" id="btn-all">Tout afficher</button>
   </div>
+
+  <div class="card timeline-wrap">
+    <div id="timeline-bar" class="timeline-bar"></div>
+    <div class="timeline-ticks">
+      <span>00:00</span><span>03:00</span><span>06:00</span><span>09:00</span>
+      <span>12:00</span><span>15:00</span><span>18:00</span><span>21:00</span><span>24:00</span>
+    </div>
+    <div id="timeline-empty" class="timeline-empty" hidden>Aucun enregistrement pour cette date.</div>
+    <div id="thumb-strip" class="thumb-strip"></div>
+  </div>
+
   <div id="recordings"></div>
 
   <div class="section-title">Parametres de la camera</div>
@@ -51,6 +62,10 @@
         <div><label>Resolution du direct</label><input type="text" id="f-scale" placeholder="ex. 854x480 (vide = originale)"></div>
       </div>
       <div class="hint">Force un reencodage du direct pour tenir dans une liaison 4G/Peplink limitee ; l'enregistrement reste toujours en pleine qualite.</div>
+
+      <div class="section-title" style="margin-top:10px">Vignettes (ligne du temps)</div>
+      <div><label>Intervalle entre deux vignettes (secondes)</label><input type="text" inputmode="numeric" id="f-thumb-interval" placeholder="ex. 60 (vide = valeur par defaut du serveur)"></div>
+      <div class="hint">Les vignettes sont extraites des enregistrements deja sur le disque (pas de connexion supplementaire a la camera) et alimentent la ligne du temps ci-dessus.</div>
 
       <div class="section-title" style="margin-top:10px">PTZ (pan / tilt / zoom)</div>
       <div class="checkbox-row"><input type="checkbox" id="f-ptz-enabled"><label>Camera PTZ (pilotage ONVIF)</label></div>
@@ -120,6 +135,7 @@ async function loadCamera() {
   document.getElementById("f-record").checked = cam.record;
   document.getElementById("f-bitrate").value = cam.live_max_bitrate_kbps || "";
   document.getElementById("f-scale").value = cam.live_scale || "";
+  document.getElementById("f-thumb-interval").value = cam.thumbnail_interval_seconds || "";
   document.getElementById("f-ptz-enabled").checked = cam.ptz_enabled;
   document.getElementById("f-onvif-url").value = cam.onvif_url || "";
   document.getElementById("f-onvif-user").value = cam.onvif_username || "";
@@ -142,11 +158,13 @@ let ptzMoving = false;
 async function ptzMove(pan, tilt, zoom) {
   ptzMoving = true;
   try {
-    await api(`/api/cameras/${encodeURIComponent(camId)}/ptz/move`, {
+    await apiJson(`/api/cameras/${encodeURIComponent(camId)}/ptz/move`, {
       method: "POST",
       body: JSON.stringify({ pan, tilt, zoom }),
     });
-  } catch (e) {}
+  } catch (e) {
+    toast(e.message || "Commande PTZ impossible");
+  }
 }
 
 async function ptzStop() {
@@ -271,12 +289,94 @@ async function loadRecordings(date) {
 }
 
 function playRecording(f) {
+  playAt(f.filename, 0);
+}
+
+function playAt(filename, offsetSeconds) {
   if (currentHls) { currentHls.destroy(); currentHls = null; }
   const videoWrap = document.getElementById("video-wrap");
   videoWrap.innerHTML = "";
-  const video = el("video", { controls: "", autoplay: "", playsinline: "", src: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}` });
+  const video = el("video", { controls: "", playsinline: "", src: `/api/cameras/${encodeURIComponent(camId)}/recordings/${filename}` });
   videoWrap.appendChild(video);
+  if (offsetSeconds > 0) {
+    video.addEventListener("loadedmetadata", () => {
+      video.currentTime = Math.min(offsetSeconds, Math.max(0, video.duration - 0.5));
+    }, { once: true });
+  }
+  video.play().catch(() => {});
   videoWrap.scrollIntoView({ behavior: "smooth" });
+}
+
+async function seekToTime(date, time) {
+  try {
+    const result = await apiJson(`/api/cameras/${encodeURIComponent(camId)}/recordings/at?ts=${encodeURIComponent(`${date}T${time}`)}`);
+    playAt(result.filename, result.offset_seconds);
+  } catch (e) {
+    toast(e.message || "Aucun enregistrement a cet instant");
+  }
+}
+
+function timeStrToSeconds(t) {
+  const [h, m, s] = t.split(":").map(Number);
+  return h * 3600 + m * 60 + s;
+}
+
+async function loadTimeline(date) {
+  const bar = document.getElementById("timeline-bar");
+  const emptyMsg = document.getElementById("timeline-empty");
+  const strip = document.getElementById("thumb-strip");
+  bar.innerHTML = "";
+  bar.onclick = null;
+  strip.innerHTML = "";
+
+  if (!date) {
+    emptyMsg.hidden = false;
+    emptyMsg.textContent = "Choisissez une date precise pour afficher la ligne du temps.";
+    return;
+  }
+
+  const [recordings, thumbnails] = await Promise.all([
+    apiJson(`/api/cameras/${encodeURIComponent(camId)}/recordings?date=${encodeURIComponent(date)}`).catch(() => []),
+    apiJson(`/api/cameras/${encodeURIComponent(camId)}/thumbnails?date=${encodeURIComponent(date)}`).catch(() => []),
+  ]);
+
+  if (recordings.length === 0) {
+    emptyMsg.hidden = false;
+    emptyMsg.textContent = "Aucun enregistrement pour cette date.";
+  } else {
+    emptyMsg.hidden = true;
+    const segSeconds = (systemInfo && systemInfo.segment_seconds) || 600;
+    recordings.forEach((r, i) => {
+      const startSec = timeStrToSeconds(r.time);
+      const nextStartSec = i + 1 < recordings.length ? timeStrToSeconds(recordings[i + 1].time) : Math.min(86400, startSec + segSeconds);
+      const widthPct = Math.max(0.15, (nextStartSec - startSec) / 864);
+      const leftPct = startSec / 864;
+      bar.appendChild(el("div", {
+        class: "timeline-seg",
+        style: `left:${leftPct}%;width:${widthPct}%`,
+        title: `${r.time}`,
+        onclick: (ev) => { ev.stopPropagation(); seekToTime(date, r.time); },
+      }));
+    });
+    bar.onclick = (ev) => {
+      const rect = bar.getBoundingClientRect();
+      const frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+      const totalSeconds = Math.round(frac * 86400);
+      const time = `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
+      seekToTime(date, time);
+    };
+  }
+
+  if (thumbnails.length === 0) {
+    strip.appendChild(el("div", { class: "hint" }, "Aucune vignette pour cette date pour l'instant (generees a partir des enregistrements termines)."));
+  } else {
+    thumbnails.forEach((t) => {
+      strip.appendChild(el("button", { type: "button", class: "thumb-item", onclick: () => seekToTime(date, t.time) }, [
+        el("img", { src: `/api/cameras/${encodeURIComponent(camId)}/thumbnails/${t.filename}`, loading: "lazy", alt: `Vignette ${t.time}` }),
+        el("div", { class: "t" }, t.time),
+      ]));
+    });
+  }
 }
 
 async function deleteRecording(f) {
@@ -286,15 +386,20 @@ async function deleteRecording(f) {
 }
 
 document.getElementById("btn-today").addEventListener("click", () => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr(new Date());
   document.getElementById("date-filter").value = today;
   loadRecordings(today);
+  loadTimeline(today);
 });
 document.getElementById("btn-all").addEventListener("click", () => {
   document.getElementById("date-filter").value = "";
   loadRecordings(null);
+  loadTimeline(null);
 });
-document.getElementById("date-filter").addEventListener("change", (e) => loadRecordings(e.target.value || null));
+document.getElementById("date-filter").addEventListener("change", (e) => {
+  loadRecordings(e.target.value || null);
+  loadTimeline(e.target.value || null);
+});
 
 document.getElementById("edit-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -312,6 +417,7 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         record: document.getElementById("f-record").checked,
         live_max_bitrate_kbps: document.getElementById("f-bitrate").value ? parseInt(document.getElementById("f-bitrate").value, 10) : null,
         live_scale: document.getElementById("f-scale").value || null,
+        thumbnail_interval_seconds: document.getElementById("f-thumb-interval").value ? parseInt(document.getElementById("f-thumb-interval").value, 10) : null,
         ptz_enabled: document.getElementById("f-ptz-enabled").checked,
         onvif_url: document.getElementById("f-onvif-url").value || null,
         onvif_username: document.getElementById("f-onvif-user").value || null,
@@ -330,11 +436,16 @@ document.getElementById("btn-delete").addEventListener("click", async () => {
   location.href = "/index.html";
 });
 
+let systemInfo = null;
+
 (async () => {
   await requireAuth();
+  systemInfo = await apiJson("/api/system").catch(() => null);
   await loadCamera();
-  await loadRecordings(new Date().toISOString().slice(0, 10));
-  document.getElementById("date-filter").value = new Date().toISOString().slice(0, 10);
+  const today = localDateStr(new Date());
+  document.getElementById("date-filter").value = today;
+  await loadRecordings(today);
+  await loadTimeline(today);
   setInterval(loadCamera, 15000);
 })();
 </script>

@@ -57,6 +57,29 @@ function statusLabel(state) {
   return labels[state] || state;
 }
 
+let _toastTimer = null;
+function toast(message) {
+  let node = document.getElementById("toast");
+  if (!node) {
+    node = document.createElement("div");
+    node.id = "toast";
+    node.className = "toast";
+    document.body.appendChild(node);
+  }
+  node.textContent = message;
+  node.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => node.classList.remove("show"), 2200);
+}
+
+// Zero-padded local date/time helpers. The server's recording filenames
+// and lookups are all in server-local wall-clock time (ffmpeg's
+// `-strftime 1`), so timestamps built here deliberately avoid UTC/ISO
+// conversion - they're plain "YYYY-MM-DD" / "HH:MM:SS" local strings.
+function pad2(n) { return String(n).padStart(2, "0"); }
+function localDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function localTimeStr(d) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; }
+
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {

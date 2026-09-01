@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -9,12 +10,13 @@ from fastapi.responses import FileResponse
 
 from app.config import Settings
 from app.deps import get_settings, get_store, require_auth
+from app.recordings import RECORDING_NAME_RE, list_recording_segments
 from app.store import CameraNotFound, CameraStore
 
 router = APIRouter(prefix="/api/cameras", tags=["media"], dependencies=[Depends(require_auth)])
 
 _HLS_NAME_RE = re.compile(r"^(stream\.m3u8|seg_\d+\.ts)$")
-_RECORDING_NAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.mp4$")
+_THUMB_NAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.jpg$")
 
 _MIME_TYPES = {
     ".m3u8": "application/vnd.apple.mpegurl",
@@ -86,7 +88,7 @@ def list_recordings(
         return []
     items = []
     for f in rec_dir.glob("*.mp4"):
-        if not _RECORDING_NAME_RE.match(f.name):
+        if not RECORDING_NAME_RE.match(f.name):
             continue
         file_date = f.name[:10]
         if date and file_date != date:
@@ -106,8 +108,89 @@ def list_recordings(
     return items
 
 
+@router.get("/{camera_id}/recordings/at")
+def find_recording_at(
+    camera_id: str,
+    ts: str,
+    store: CameraStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+):
+    """Given an ISO 8601 timestamp, find which recording segment covers it
+    and the offset (seconds) to seek to within that file — used by the
+    timeline and thumbnail strip to jump playback to an exact point in
+    time, without the client needing to know the segment length."""
+    _require_camera(camera_id, store)
+    try:
+        target = datetime.fromisoformat(ts)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Horodatage invalide (attendu au format ISO 8601)")
+
+    segments = list_recording_segments(settings.recordings_dir / camera_id)
+    if not segments:
+        raise HTTPException(status_code=404, detail="Aucun enregistrement pour cette camera")
+
+    chosen = None
+    for start, path in segments:
+        if start <= target:
+            chosen = (start, path)
+        else:
+            break
+    if chosen is None:
+        chosen = segments[0]  # target is before anything recorded: snap to the earliest segment
+    start, path = chosen
+    offset = max(0.0, (target - start).total_seconds())
+    return {"filename": path.name, "offset_seconds": offset}
+
+
+@router.get("/{camera_id}/thumbnails")
+def list_thumbnails(
+    camera_id: str,
+    date: str | None = None,
+    store: CameraStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+):
+    _require_camera(camera_id, store)
+    thumb_dir = settings.thumbnails_dir / camera_id
+    if not thumb_dir.exists():
+        return []
+    items = []
+    for f in thumb_dir.glob("*.jpg"):
+        if not _THUMB_NAME_RE.match(f.name):
+            continue
+        file_date = f.name[:10]
+        if date and file_date != date:
+            continue
+        items.append({
+            "filename": f.name,
+            "date": file_date,
+            "time": f.name[11:19].replace("-", ":"),
+        })
+    items.sort(key=lambda i: i["filename"])
+    return items
+
+
+@router.get("/{camera_id}/thumbnails/{filename}")
+def get_thumbnail(
+    camera_id: str,
+    filename: str,
+    store: CameraStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+):
+    _require_camera(camera_id, store)
+    if not _THUMB_NAME_RE.match(filename):
+        raise HTTPException(status_code=400, detail="Nom de fichier invalide")
+    thumb_dir = (settings.thumbnails_dir / camera_id).resolve()
+    path = (thumb_dir / filename).resolve()
+    if thumb_dir not in path.parents or not path.is_file():
+        raise HTTPException(status_code=404, detail="Vignette introuvable")
+    # Thumbnails are never modified after creation, so they can be cached
+    # aggressively by the browser.
+    headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+    return FileResponse(path, media_type="image/jpeg", headers=headers)
+
+
 def _resolve_recording_path(settings: Settings, camera_id: str, filename: str) -> Path:
-    if not _RECORDING_NAME_RE.match(filename):
+    if not RECORDING_NAME_RE.match(filename):
         raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     rec_dir = (settings.recordings_dir / camera_id).resolve()
     path = (rec_dir / filename).resolve()

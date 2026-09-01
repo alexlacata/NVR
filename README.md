@@ -22,6 +22,9 @@ ou en différé depuis un téléphone ou un ordinateur, via un navigateur web.
 - **Bande passante maîtrisée pour le direct** : bitrate et résolution du
   flux "direct" plafonnables indépendamment de l'enregistrement — pensé pour
   les liaisons 4G/5G limitées (routeur cellulaire type Peplink).
+- **Ligne du temps et vignettes** : relecture par simple clic sur une ligne
+  du temps 24h ou sur une bande de vignettes, générées à intervalle
+  configurable à partir des enregistrements déjà sur le disque.
 
 ## Architecture en bref
 
@@ -125,6 +128,25 @@ déplacer la caméra, relâchez pour arrêter. Le bouton **+ Préselection**
 enregistre la position actuelle de la caméra sous un nom, pour y revenir
 d'un tap.
 
+## Relire un enregistrement : ligne du temps et vignettes
+
+Sur la page de la caméra, sous la vidéo, une ligne du temps représente les
+24 heures de la date sélectionnée : les portions enregistrées apparaissent
+en surbrillance. Cliquez n'importe où sur la ligne pour lancer la lecture à
+cet instant précis — le serveur retrouve automatiquement le bon fichier et
+se positionne au bon endroit dedans, vous n'avez pas besoin de chercher le
+fichier vous-même.
+
+En dessous, une bande de vignettes (miniatures) défile horizontalement ;
+chacune est extraite des enregistrements déjà sur le disque, à intervalle
+régulier. Cliquer sur une vignette lance la lecture à cet instant, comme sur
+la ligne du temps. Réglez l'intervalle par caméra dans *Vignettes (ligne du
+temps)* sur la page de la caméra (par défaut : une vignette par minute,
+`NVR_THUMBNAIL_INTERVAL_SECONDS`). Comme pour les enregistrements, les
+vignettes ne coûtent aucune bande passante caméra supplémentaire : elles
+sont extraites localement des fichiers déjà enregistrés, jamais d'une
+connexion en direct.
+
 ## Regarder depuis le téléphone
 
 - **Sur le même réseau Wi-Fi** : ouvrez `http://<ip-locale-du-serveur>:8000`
@@ -190,6 +212,8 @@ caméras sur la 4G pour pouvoir enregistrer.
 | `NVR_MIN_FREE_DISK_PERCENT` | `10` | Purge des plus anciens enregistrements sous ce seuil d'espace libre |
 | `NVR_HLS_SEGMENT_SECONDS` | `2` | Taille des segments HLS (latence du direct) |
 | `NVR_HLS_LIST_SIZE` | `6` | Nombre de segments HLS conservés dans la playlist (marge sur liaison instable) |
+| `NVR_THUMBNAIL_INTERVAL_SECONDS` | `60` | Intervalle par défaut entre deux vignettes (secondes), surchargeable par caméra |
+| `NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS` | `30` | Fréquence de vérification des nouveaux enregistrements à traiter |
 | `NVR_PORT` | `8000` | Port d'écoute |
 
 ## Structure du dépôt
@@ -201,7 +225,9 @@ app/
   store.py            persistance des caméras (YAML)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
-  retention.py         purge automatique des enregistrements
+  retention.py         purge automatique des enregistrements et vignettes
+  recordings.py         nommage/parcours des segments enregistrés (partagé)
+  thumbnails.py          extraction des vignettes depuis les segments termines
   auth.py              authentification par session
   onvif_ptz.py          client ONVIF (pilotage PTZ)
   ptz_registry.py        cache des clients PTZ par caméra
