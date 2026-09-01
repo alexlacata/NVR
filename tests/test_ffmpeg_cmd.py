@@ -43,3 +43,34 @@ def test_test_source_generates_synthetic_lavfi_input(tmp_path: Path):
     cmd = build_record_cmd("ffmpeg", cam, tmp_path, segment_seconds=600)
     assert "lavfi" in cmd
     assert "-c:v" in cmd and "libx264" in cmd  # re-encoded, not copied
+
+
+def test_live_bitrate_cap_forces_reencode_even_when_copy_capable(tmp_path: Path):
+    cam = _camera(live_max_bitrate_kbps=800)
+    cmd = build_live_cmd("ffmpeg", cam, tmp_path, hls_segment_seconds=2, hls_list_size=6)
+    assert "copy" not in cmd  # forced re-encode, not stream copy
+    assert "-b:v" in cmd
+    assert cmd[cmd.index("-b:v") + 1] == "800k"
+    assert "-maxrate" in cmd
+    assert "-bufsize" in cmd
+
+
+def test_live_scale_forces_reencode_and_adds_vf(tmp_path: Path):
+    cam = _camera(live_scale="640x360")
+    cmd = build_live_cmd("ffmpeg", cam, tmp_path, hls_segment_seconds=2, hls_list_size=6)
+    assert "-vf" in cmd
+    assert cmd[cmd.index("-vf") + 1] == "scale=640:360"
+
+
+def test_live_without_cap_still_stream_copies_rtsp(tmp_path: Path):
+    cmd = build_live_cmd("ffmpeg", _camera(), tmp_path, hls_segment_seconds=2, hls_list_size=6)
+    assert "-c:v" in cmd and "copy" in cmd
+    assert "-b:v" not in cmd
+
+
+def test_record_leg_ignores_live_bandwidth_caps(tmp_path: Path):
+    cam = _camera(live_max_bitrate_kbps=800, live_scale="640x360")
+    cmd = build_record_cmd("ffmpeg", cam, tmp_path, segment_seconds=600)
+    assert "-c" in cmd and "copy" in cmd  # recording stays full quality/stream-copy
+    assert "-b:v" not in cmd
+    assert "-vf" not in cmd

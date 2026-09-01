@@ -169,6 +169,7 @@ function openAddModal() {
     el("div", {}, [el("label", {}, "URL du flux secondaire (direct, optionnel)"), liveUrlInput,
       el("div", { class: "hint" }, "Laisser vide pour utiliser le meme flux en direct et pour l'enregistrement.")]),
     el("div", { class: "checkbox-row" }, [recordCheckbox, el("label", {}, "Enregistrer en continu sur le disque")]),
+    el("div", { class: "hint" }, "Le PTZ et la limite de bitrate se configurent ensuite sur la page de la camera."),
     errorEl,
     el("div", { class: "actions" }, [
       el("button", { type: "submit", class: "btn" }, "Ajouter"),

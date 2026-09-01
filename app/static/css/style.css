@@ -240,3 +240,19 @@ form.form-grid .actions { display: flex; gap: 10px; margin-top: 6px; }
 .icon { width: 20px; height: 20px; }
 
 .spinner-row { text-align: center; color: var(--text-dim); padding: 30px; }
+
+.ptz-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 52px);
+  gap: 4px;
+}
+.ptz-btn {
+  padding: 0;
+  font-size: 18px;
+  user-select: none;
+  touch-action: none;
+}
+.ptz-zoom { display: flex; flex-direction: column; gap: 4px; }
+.ptz-zoom .ptz-btn { width: 90px; height: 52px; font-size: 13px; }
+.ptz-presets { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

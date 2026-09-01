@@ -5,6 +5,7 @@ from fastapi import HTTPException, Request, status
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
 from app.ffmpeg_manager import StreamManager
+from app.ptz_registry import PTZRegistry
 from app.store import CameraStore
 
 
@@ -22,6 +23,10 @@ def get_stream_manager(request: Request) -> StreamManager:
 
 def get_auth_service(request: Request) -> AuthService:
     return request.app.state.auth_service
+
+
+def get_ptz_registry(request: Request) -> PTZRegistry:
+    return request.app.state.ptz_registry
 
 
 def require_auth(request: Request) -> str:

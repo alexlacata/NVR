@@ -17,6 +17,11 @@ ou en différé depuis un téléphone ou un ordinateur, via un navigateur web.
   application) et relecture des enregistrements, avec téléchargement.
 - **Redémarrage automatique** des flux en cas de coupure caméra ou réseau.
 - **Authentification** simple par identifiant/mot de passe, session signée.
+- **Caméras PTZ** : pilotage pan/tilt/zoom et préréglages (presets) via
+  ONVIF, directement depuis le téléphone.
+- **Bande passante maîtrisée pour le direct** : bitrate et résolution du
+  flux "direct" plafonnables indépendamment de l'enregistrement — pensé pour
+  les liaisons 4G/5G limitées (routeur cellulaire type Peplink).
 
 ## Architecture en bref
 
@@ -98,6 +103,28 @@ Dans l'interface, cliquez sur **+ Camera** et renseignez :
   la charge CPU et la bande passante vers le téléphone, tout en gardant le
   flux principal en haute résolution pour l'enregistrement.
 
+Le PTZ et la limite de bande passante du direct se configurent ensuite sur
+la page de la caméra (section *Bande passante du direct* et *PTZ*).
+
+## Piloter une caméra PTZ
+
+Sur la page de la caméra, cochez **Camera PTZ (pilotage ONVIF)** et
+renseignez :
+
+- **URL du service ONVIF** : `http://<ip-camera>:<port>/onvif/device_service`
+  (port ONVIF le plus souvent `80` ou `8080` — different du port RTSP `554` ;
+  reportez-vous à la doc de votre caméra). Vérifiez au préalable que le
+  service ONVIF est bien activé dans les réglages de la caméra.
+- **Utilisateur / mot de passe ONVIF** : souvent les mêmes identifiants que
+  pour le flux RTSP, mais pas toujours — certaines caméras ont un compte
+  ONVIF séparé.
+
+Une fois activé, un pavé directionnel et les boutons de zoom apparaissent
+au-dessus de la liste des enregistrements : maintenez un bouton appuyé pour
+déplacer la caméra, relâchez pour arrêter. Le bouton **+ Préselection**
+enregistre la position actuelle de la caméra sous un nom, pour y revenir
+d'un tap.
+
 ## Regarder depuis le téléphone
 
 - **Sur le même réseau Wi-Fi** : ouvrez `http://<ip-locale-du-serveur>:8000`
@@ -111,6 +138,45 @@ Dans l'interface, cliquez sur **+ Camera** et renseignez :
   service sur Internet, placez-le derrière un reverse proxy HTTPS (ex.
   Caddy, Nginx + Let's Encrypt) et gardez un mot de passe fort.
 
+## Déploiement avec un routeur 4G (Peplink ou équivalent)
+
+Cas d'usage typique : le NVR et les caméras sont sur site (chantier,
+événement, véhicule...), reliés à Internet par un routeur cellulaire
+(Peplink ou autre) qui fait office de liaison retour, et vous voulez
+regarder/enregistrer à distance.
+
+**Topologie recommandée : le NVR reste sur place, à côté des caméras.**
+Le disque dur et les caméras restent en réseau local (Ethernet/Wi-Fi
+local), seul le trafic de *visionnage* (HLS vers votre téléphone) traverse
+la liaison 4G. C'est nettement plus économe en data et plus robuste qu'un
+NVR distant qui devrait faire transiter en continu les flux RTSP des
+caméras sur la 4G pour pouvoir enregistrer.
+
+1. **Accès distant via le Peplink** : deux options, selon ce que propose
+   votre modèle —
+   - **SpeedFusion VPN / InControl Remote Web Access** (si disponible sur
+     votre Peplink) : le plus simple, pas de port à ouvrir.
+   - **Redirection de port (port forwarding)** sur le Peplink vers le port
+     `8000` du NVR : fonctionne partout, mais exposez alors le service
+     derrière HTTPS (reverse proxy) et gardez un mot de passe fort — voir
+     la section *Regarder depuis le téléphone* ci-dessus. Une alternative
+     plus sûre reste un VPN dédié (Tailscale/WireGuard) au-dessus de la
+     liaison Peplink.
+2. **Limitez la consommation de data** : sur chaque caméra, réglez
+   *Bitrate maximum du direct* (ex. `500`-`800` kbps) et *Résolution du
+   direct* (ex. `640x360`) dans les réglages de la caméra. L'enregistrement
+   local, lui, reste toujours en pleine qualité — seul le flux envoyé vers
+   votre téléphone est réduit. Un forfait 4G data-limité tient ainsi
+   beaucoup mieux la charge, y compris avec plusieurs caméras.
+3. **Fiabilité sur liaison cellulaire** : le flux RTSP est déjà transporté
+   en TCP par défaut (plus tolérant aux pertes/latence que l'UDP sur une
+   liaison mobile), et chaque flux redémarre automatiquement en cas de
+   coupure (bascule Peplink entre SIM/WAN, perte de couverture...). Côté
+   lecture, hls.js réessaie déjà automatiquement les segments manquants ;
+   si les coupures sont fréquentes, augmentez `NVR_HLS_LIST_SIZE` pour
+   donner plus de marge (fenêtre de rattrapage plus longue) au prix d'un
+   direct légèrement moins "temps réel".
+
 ## Configuration (variables d'environnement)
 
 | Variable | Défaut | Description |
@@ -123,6 +189,7 @@ Dans l'interface, cliquez sur **+ Camera** et renseignez :
 | `NVR_RETENTION_DAYS` | `14` | Suppression des enregistrements plus vieux que N jours |
 | `NVR_MIN_FREE_DISK_PERCENT` | `10` | Purge des plus anciens enregistrements sous ce seuil d'espace libre |
 | `NVR_HLS_SEGMENT_SECONDS` | `2` | Taille des segments HLS (latence du direct) |
+| `NVR_HLS_LIST_SIZE` | `6` | Nombre de segments HLS conservés dans la playlist (marge sur liaison instable) |
 | `NVR_PORT` | `8000` | Port d'écoute |
 
 ## Structure du dépôt
@@ -136,7 +203,9 @@ app/
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
   retention.py         purge automatique des enregistrements
   auth.py              authentification par session
-  api/                 routes FastAPI (auth, caméras, médias, système)
+  onvif_ptz.py          client ONVIF (pilotage PTZ)
+  ptz_registry.py        cache des clients PTZ par caméra
+  api/                 routes FastAPI (auth, caméras, médias, PTZ, système)
   static/              interface web (HTML/CSS/JS, sans build)
 tests/                 tests automatisés (pytest)
 ```
@@ -168,3 +237,9 @@ le flux HLS sont bien produits sur disque ; il est automatiquement ignoré si
   vidéo seule pour garantir la compatibilité avec tous les navigateurs et
   limiter la consommation de données mobiles. Les enregistrements
   téléchargés conservent le son d'origine de la caméra.
+- **Le pavé PTZ ne répond pas / "Préselections indisponibles"** : vérifiez
+  que le service ONVIF est activé dans les réglages de la caméra, que
+  l'URL ONVIF est correcte (port souvent différent du port RTSP) et que les
+  identifiants ONVIF sont les bons. Les commandes PTZ échouent silencieusement
+  si la caméra ONVIF n'est pas joignable (le bouton ne fait rien) ; les
+  journaux du serveur affichent le détail de l'erreur.

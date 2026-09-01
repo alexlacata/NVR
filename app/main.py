@@ -8,10 +8,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import routes_auth, routes_cameras, routes_media, routes_system
+from app.api import routes_auth, routes_cameras, routes_media, routes_ptz, routes_system
 from app.auth import AuthService
 from app.config import get_settings
 from app.ffmpeg_manager import StreamManager
+from app.ptz_registry import PTZRegistry
 from app.retention import retention_loop
 from app.store import CameraStore
 
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
     app.state.store = CameraStore(settings.cameras_file)
     app.state.auth_service = AuthService(settings)
     app.state.stream_manager = StreamManager(settings)
+    app.state.ptz_registry = PTZRegistry()
 
     await app.state.stream_manager.reconcile(app.state.store.list())
 
@@ -50,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_auth.router)
     app.include_router(routes_cameras.router)
     app.include_router(routes_media.router)
+    app.include_router(routes_ptz.router)
     app.include_router(routes_system.router)
 
     @app.get("/healthz")

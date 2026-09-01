@@ -18,6 +18,8 @@
     <div class="video-wrap detail-video" id="video-wrap"></div>
   </div>
 
+  <div id="ptz-panel" hidden></div>
+
   <div class="section-title">Enregistrements</div>
   <div class="row" style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
     <input type="date" id="date-filter" class="card" style="padding:8px 10px;background:var(--bg-elevated);color:var(--text);border:1px solid var(--border);border-radius:8px">
@@ -42,6 +44,24 @@
       <div><label>URL du flux secondaire (direct, optionnel)</label><input type="text" id="f-live-url"></div>
       <div class="checkbox-row"><input type="checkbox" id="f-enabled"><label>Camera activee</label></div>
       <div class="checkbox-row"><input type="checkbox" id="f-record"><label>Enregistrer en continu</label></div>
+
+      <div class="section-title" style="margin-top:10px">Bande passante du direct (4G / liaison limitee)</div>
+      <div class="row">
+        <div><label>Bitrate maximum du direct (kbps)</label><input type="text" inputmode="numeric" id="f-bitrate" placeholder="ex. 800 (vide = illimite)"></div>
+        <div><label>Resolution du direct</label><input type="text" id="f-scale" placeholder="ex. 854x480 (vide = originale)"></div>
+      </div>
+      <div class="hint">Force un reencodage du direct pour tenir dans une liaison 4G/Peplink limitee ; l'enregistrement reste toujours en pleine qualite.</div>
+
+      <div class="section-title" style="margin-top:10px">PTZ (pan / tilt / zoom)</div>
+      <div class="checkbox-row"><input type="checkbox" id="f-ptz-enabled"><label>Camera PTZ (pilotage ONVIF)</label></div>
+      <div id="ptz-fields">
+        <div><label>URL du service ONVIF</label><input type="text" id="f-onvif-url" placeholder="http://192.168.1.51:8080/onvif/device_service"></div>
+        <div class="row">
+          <div><label>Utilisateur ONVIF</label><input type="text" id="f-onvif-user"></div>
+          <div><label>Mot de passe ONVIF</label><input type="password" id="f-onvif-pass" autocomplete="new-password"></div>
+        </div>
+      </div>
+
       <div class="error-msg" id="edit-error"></div>
       <div class="actions">
         <button type="submit" class="btn">Enregistrer</button>
@@ -98,8 +118,119 @@ async function loadCamera() {
   document.getElementById("f-live-url").value = cam.live_url || "";
   document.getElementById("f-enabled").checked = cam.enabled;
   document.getElementById("f-record").checked = cam.record;
+  document.getElementById("f-bitrate").value = cam.live_max_bitrate_kbps || "";
+  document.getElementById("f-scale").value = cam.live_scale || "";
+  document.getElementById("f-ptz-enabled").checked = cam.ptz_enabled;
+  document.getElementById("f-onvif-url").value = cam.onvif_url || "";
+  document.getElementById("f-onvif-user").value = cam.onvif_username || "";
+  document.getElementById("f-onvif-pass").value = cam.onvif_password || "";
+  updatePtzFieldsVisibility();
+
+  renderPtzPanel(cam);
 
   return cam;
+}
+
+function updatePtzFieldsVisibility() {
+  document.getElementById("ptz-fields").hidden = !document.getElementById("f-ptz-enabled").checked;
+}
+document.getElementById("f-ptz-enabled").addEventListener("change", updatePtzFieldsVisibility);
+
+// --- PTZ ---
+let ptzMoving = false;
+
+async function ptzMove(pan, tilt, zoom) {
+  ptzMoving = true;
+  try {
+    await api(`/api/cameras/${encodeURIComponent(camId)}/ptz/move`, {
+      method: "POST",
+      body: JSON.stringify({ pan, tilt, zoom }),
+    });
+  } catch (e) {}
+}
+
+async function ptzStop() {
+  if (!ptzMoving) return;
+  ptzMoving = false;
+  try {
+    await api(`/api/cameras/${encodeURIComponent(camId)}/ptz/stop`, { method: "POST" });
+  } catch (e) {}
+}
+
+function ptzButton(label, pan, tilt, zoom) {
+  const btn = el("button", { type: "button", class: "btn secondary ptz-btn" }, label);
+  const start = (ev) => { ev.preventDefault(); ptzMove(pan, tilt, zoom); };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", ptzStop);
+  btn.addEventListener("pointerleave", ptzStop);
+  btn.addEventListener("pointercancel", ptzStop);
+  return btn;
+}
+
+async function loadPtzPresets(container) {
+  container.innerHTML = "";
+  let presets = [];
+  try {
+    presets = await apiJson(`/api/cameras/${encodeURIComponent(camId)}/ptz/presets`);
+  } catch (e) {
+    container.appendChild(el("span", { class: "hint" }, "Preselections indisponibles"));
+    return;
+  }
+  presets.forEach((p) => {
+    const goBtn = el("button", { type: "button", class: "btn secondary", onclick: async () => {
+      await api(`/api/cameras/${encodeURIComponent(camId)}/ptz/presets/${encodeURIComponent(p.token)}/goto`, { method: "POST" });
+    }}, p.name);
+    const delBtn = el("button", { type: "button", class: "icon-btn", onclick: async () => {
+      if (!confirm(`Supprimer la preselection "${p.name}" ?`)) return;
+      await api(`/api/cameras/${encodeURIComponent(camId)}/ptz/presets/${encodeURIComponent(p.token)}`, { method: "DELETE" });
+      await loadPtzPresets(container);
+    }}, "✕");
+    container.appendChild(el("div", { style: "display:flex;align-items:center;gap:4px" }, [goBtn, delBtn]));
+  });
+  const addBtn = el("button", { type: "button", class: "btn secondary", onclick: async () => {
+    const name = prompt("Nom de la preselection (position actuelle) :");
+    if (!name) return;
+    await apiJson(`/api/cameras/${encodeURIComponent(camId)}/ptz/presets`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    await loadPtzPresets(container);
+  }}, "+ Preselection");
+  container.appendChild(addBtn);
+}
+
+function renderPtzPanel(cam) {
+  const panel = document.getElementById("ptz-panel");
+  if (!cam.ptz_enabled) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+  if (panel.dataset.rendered === cam.id) return; // avoid rebuilding on every 15s poll
+  panel.hidden = false;
+  panel.innerHTML = "";
+  panel.dataset.rendered = cam.id;
+
+  const pad = el("div", { class: "ptz-pad" }, [
+    ptzButton("↖", -0.5, 0.5, 0), ptzButton("↑", 0, 0.5, 0), ptzButton("↗", 0.5, 0.5, 0),
+    ptzButton("←", -0.5, 0, 0), ptzButton("⏹", 0, 0, 0), ptzButton("→", 0.5, 0, 0),
+    ptzButton("↙", -0.5, -0.5, 0), ptzButton("↓", 0, -0.5, 0), ptzButton("↘", 0.5, -0.5, 0),
+  ]);
+  const zoom = el("div", { class: "ptz-zoom" }, [
+    ptzButton("Zoom −", 0, 0, -0.5),
+    ptzButton("Zoom +", 0, 0, 0.5),
+  ]);
+  const presetsRow = el("div", { class: "ptz-presets" });
+  loadPtzPresets(presetsRow);
+
+  panel.appendChild(el("div", { class: "card" }, [
+    el("div", { style: "padding:14px 16px" }, [
+      el("div", { class: "section-title", style: "margin:0 0 10px" }, "Controle PTZ"),
+      el("div", { style: "display:flex;gap:20px;flex-wrap:wrap;align-items:center" }, [pad, zoom]),
+      el("div", { class: "section-title", style: "margin:16px 0 8px" }, "Preselections"),
+      presetsRow,
+    ]),
+  ]));
 }
 
 function groupByDate(items) {
@@ -179,6 +310,12 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         live_url: document.getElementById("f-live-url").value || null,
         enabled: document.getElementById("f-enabled").checked,
         record: document.getElementById("f-record").checked,
+        live_max_bitrate_kbps: document.getElementById("f-bitrate").value ? parseInt(document.getElementById("f-bitrate").value, 10) : null,
+        live_scale: document.getElementById("f-scale").value || null,
+        ptz_enabled: document.getElementById("f-ptz-enabled").checked,
+        onvif_url: document.getElementById("f-onvif-url").value || null,
+        onvif_username: document.getElementById("f-onvif-user").value || null,
+        onvif_password: document.getElementById("f-onvif-pass").value || null,
       }),
     });
     await loadCamera();

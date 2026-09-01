@@ -74,8 +74,12 @@ def _input_spec(source_type: SourceType, url: str) -> InputSpec:
     raise ValueError(f"Unknown source type: {source_type}")
 
 
-def _video_codec_args(gop_seconds: int) -> list[str]:
-    return [
+def _video_codec_args(
+    gop_seconds: int,
+    max_bitrate_kbps: Optional[int] = None,
+    scale: Optional[str] = None,
+) -> list[str]:
+    args = [
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-tune", "zerolatency",
@@ -83,6 +87,16 @@ def _video_codec_args(gop_seconds: int) -> list[str]:
         "-g", str(gop_seconds * 25),
         "-r", "25",
     ]
+    if scale:
+        width, height = scale.split("x")
+        args += ["-vf", f"scale={width}:{height}"]
+    if max_bitrate_kbps:
+        args += [
+            "-b:v", f"{max_bitrate_kbps}k",
+            "-maxrate", f"{max_bitrate_kbps}k",
+            "-bufsize", f"{max_bitrate_kbps * 2}k",
+        ]
+    return args
 
 
 _AUDIO_CODEC_ARGS = ["-c:a", "aac", "-b:a", "96k", "-ar", "44100"]
@@ -132,7 +146,18 @@ def build_live_cmd(
     url = camera.live_url or camera.url
     spec = _input_spec(camera.source_type, url)
 
-    codec_args = ["-c:v", "copy"] if spec.copy_ok else _video_codec_args(gop_seconds=hls_segment_seconds)
+    # A bitrate cap or forced resolution (used to fit the live view through a
+    # constrained/metered uplink, e.g. a cellular router) requires
+    # re-encoding even when the source could otherwise be stream-copied.
+    needs_cap = bool(camera.live_max_bitrate_kbps or camera.live_scale)
+    if spec.copy_ok and not needs_cap:
+        codec_args = ["-c:v", "copy"]
+    else:
+        codec_args = _video_codec_args(
+            gop_seconds=hls_segment_seconds,
+            max_bitrate_kbps=camera.live_max_bitrate_kbps,
+            scale=camera.live_scale,
+        )
 
     playlist = str(out_dir / "stream.m3u8")
     segment_pattern = str(out_dir / "seg_%08d.ts")

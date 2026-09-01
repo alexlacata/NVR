@@ -4,9 +4,10 @@ import shutil
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.deps import get_settings, get_store, get_stream_manager, require_auth
+from app.deps import get_ptz_registry, get_settings, get_store, get_stream_manager, require_auth
 from app.ffmpeg_manager import StreamManager
 from app.models import Camera, CameraCreate, CameraUpdate, CameraWithStatus
+from app.ptz_registry import PTZRegistry
 from app.store import CameraNotFound, CameraStore, DuplicateCameraId
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"], dependencies=[Depends(require_auth)])
@@ -73,12 +74,14 @@ async def delete_camera(
     store: CameraStore = Depends(get_store),
     manager: StreamManager = Depends(get_stream_manager),
     settings=Depends(get_settings),
+    ptz_registry: PTZRegistry = Depends(get_ptz_registry),
 ):
     try:
         store.delete(camera_id)
     except CameraNotFound:
         raise HTTPException(status_code=404, detail="Camera introuvable")
     await manager.reconcile(store.list())
+    ptz_registry.invalidate(camera_id)
     shutil.rmtree(settings.hls_dir / camera_id, ignore_errors=True)
     if delete_recordings:
         shutil.rmtree(settings.recordings_dir / camera_id, ignore_errors=True)
