@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NVR - Cameras</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1>📹 NVR</h1>
+  <div class="actions">
+    <button class="btn secondary" id="btn-add">+ Camera</button>
+    <button class="btn secondary" id="btn-logout">Deconnexion</button>
+  </div>
+</div>
+<div class="container">
+  <div class="card" style="padding:14px 16px" id="disk-card"></div>
+  <div id="grid" class="grid"></div>
+</div>
+
+<div id="modal-root"></div>
+
+<script src="/js/hls.min.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const grid = document.getElementById("grid");
+const cards = {}; // camera id -> { cam, cardEl, badgeEl, videoWrapEl, hls }
+
+function renderDiskCard(info) {
+  const card = document.getElementById("disk-card");
+  card.innerHTML = "";
+  const pct = 100 - info.disk_free_percent;
+  card.appendChild(el("div", { class: "disk-bar-wrap" }, [
+    el("div", { class: "disk-bar", style: `width:${pct}%` }),
+  ]));
+  card.appendChild(el("div", { class: "disk-info" }, [
+    el("span", {}, `${fmtBytes(info.disk_used_bytes)} utilises sur ${fmtBytes(info.disk_total_bytes)}`),
+    el("span", {}, `${info.disk_free_percent}% libre - retention ${info.retention_days} j`),
+  ]));
+}
+
+function attachVideo(videoWrap, cam) {
+  const state = cam.status.state;
+  videoWrap.innerHTML = "";
+  if (state !== "running" && state !== "starting") {
+    videoWrap.appendChild(el("div", { class: "offline" }, statusLabel(state)));
+    return null;
+  }
+  const video = el("video", { muted: "", autoplay: "", playsinline: "", loop: "" });
+  videoWrap.appendChild(video);
+  return attachHls(video, `/api/cameras/${cam.id}/live/stream.m3u8`, () => {
+    videoWrap.innerHTML = "";
+    videoWrap.appendChild(el("div", { class: "offline" }, "Flux indisponible pour le moment"));
+  });
+}
+
+function cameraCard(cam) {
+  const badge = el("span", { class: `badge ${cam.status.state}` }, [
+    el("span", { class: "dot" }),
+    statusLabel(cam.status.state),
+  ]);
+  const videoWrap = el("div", { class: "video-wrap" });
+  const cardEl = el("div", { class: "card cam-card" }, [
+    videoWrap,
+    el("div", { class: "meta" }, [
+      el("a", { href: `/camera.html?id=${encodeURIComponent(cam.id)}` }, cam.name),
+      badge,
+    ]),
+  ]);
+  const entry = { cam, cardEl, badgeEl: badge, videoWrapEl: videoWrap, hls: null };
+  entry.hls = attachVideo(videoWrap, cam);
+  return entry;
+}
+
+async function loadCameras() {
+  const cameras = await apiJson("/api/cameras");
+  const seenIds = new Set();
+
+  if (cameras.length === 0 && Object.keys(cards).length === 0 && !grid.dataset.emptyShown) {
+    grid.innerHTML = "";
+    grid.appendChild(el("div", { class: "empty-state" }, [
+      el("p", {}, "Aucune camera configuree."),
+      el("button", { class: "btn", onclick: () => openAddModal() }, "Ajouter une camera"),
+    ]));
+    grid.dataset.emptyShown = "1";
+    return;
+  }
+
+  cameras.forEach((cam) => {
+    seenIds.add(cam.id);
+    const existing = cards[cam.id];
+    if (!existing) {
+      if (grid.dataset.emptyShown) { grid.innerHTML = ""; delete grid.dataset.emptyShown; }
+      const entry = cameraCard(cam);
+      cards[cam.id] = entry;
+      grid.appendChild(entry.cardEl);
+      return;
+    }
+    existing.cam = cam;
+    if (existing.badgeEl.className !== `badge ${cam.status.state}`) {
+      existing.badgeEl.className = `badge ${cam.status.state}`;
+      existing.badgeEl.innerHTML = "";
+      existing.badgeEl.appendChild(el("span", { class: "dot" }));
+      existing.badgeEl.appendChild(document.createTextNode(statusLabel(cam.status.state)));
+      if (existing.hls) existing.hls.destroy();
+      existing.hls = attachVideo(existing.videoWrapEl, cam);
+    }
+  });
+
+  for (const id of Object.keys(cards)) {
+    if (!seenIds.has(id)) {
+      if (cards[id].hls) cards[id].hls.destroy();
+      cards[id].cardEl.remove();
+      delete cards[id];
+    }
+  }
+}
+
+async function loadDisk() {
+  try {
+    const info = await apiJson("/api/system");
+    renderDiskCard(info);
+  } catch (e) {}
+}
+
+function closeModal() {
+  document.getElementById("modal-root").innerHTML = "";
+}
+
+function openAddModal() {
+  const root = document.getElementById("modal-root");
+  const errorEl = el("div", { class: "error-msg" });
+
+  const nameInput = el("input", { type: "text", required: "" });
+  const typeSelect = el("select", {}, [
+    el("option", { value: "rtsp" }, "RTSP (camera IP)"),
+    el("option", { value: "http" }, "HTTP / MJPEG"),
+    el("option", { value: "usb" }, "USB / peripherique local"),
+    el("option", { value: "test" }, "Test (mire synthetique)"),
+  ]);
+  const urlInput = el("input", { type: "text", placeholder: "rtsp://utilisateur:motdepasse@192.168.1.50:554/stream1" });
+  const liveUrlInput = el("input", { type: "text", placeholder: "(optionnel) sous-flux basse resolution pour le direct" });
+  const recordCheckbox = el("input", { type: "checkbox", checked: "" });
+
+  const form = el("form", { class: "form-grid", onsubmit: async (ev) => {
+    ev.preventDefault();
+    errorEl.textContent = "";
+    try {
+      await apiJson("/api/cameras", {
+        method: "POST",
+        body: JSON.stringify({
+          name: nameInput.value,
+          source_type: typeSelect.value,
+          url: urlInput.value,
+          live_url: liveUrlInput.value || null,
+          record: recordCheckbox.checked,
+        }),
+      });
+      closeModal();
+      await loadCameras();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    }
+  }}, [
+    el("div", {}, [el("label", {}, "Nom"), nameInput]),
+    el("div", {}, [el("label", {}, "Type de source"), typeSelect]),
+    el("div", {}, [el("label", {}, "URL du flux principal (enregistrement)"), urlInput]),
+    el("div", {}, [el("label", {}, "URL du flux secondaire (direct, optionnel)"), liveUrlInput,
+      el("div", { class: "hint" }, "Laisser vide pour utiliser le meme flux en direct et pour l'enregistrement.")]),
+    el("div", { class: "checkbox-row" }, [recordCheckbox, el("label", {}, "Enregistrer en continu sur le disque")]),
+    errorEl,
+    el("div", { class: "actions" }, [
+      el("button", { type: "submit", class: "btn" }, "Ajouter"),
+      el("button", { type: "button", class: "btn secondary", onclick: closeModal }, "Annuler"),
+    ]),
+  ]);
+
+  root.appendChild(el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === e.currentTarget) closeModal(); } }, [
+    el("div", { class: "modal" }, [
+      el("div", { class: "modal-header" }, [
+        el("h2", {}, "Ajouter une camera"),
+        el("button", { class: "close-btn", onclick: closeModal }, "×"),
+      ]),
+      form,
+    ]),
+  ]));
+}
+
+document.getElementById("btn-add").addEventListener("click", openAddModal);
+document.getElementById("btn-logout").addEventListener("click", logout);
+
+(async () => {
+  await requireAuth();
+  await loadDisk();
+  await loadCameras();
+  setInterval(loadCameras, 15000);
+  setInterval(loadDisk, 30000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NVR - Connexion</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card login-card">
+    <h1>NVR</h1>
+    <p class="sub">Connectez-vous pour voir vos cameras</p>
+    <form class="form-grid" id="login-form">
+      <div>
+        <label for="username">Utilisateur</label>
+        <input type="text" id="username" autocomplete="username" required>
+      </div>
+      <div>
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <div class="error-msg" id="error"></div>
+      <div class="actions">
+        <button type="submit" class="btn" style="width:100%">Se connecter</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script src="/js/app.js"></script>
+<script>
+document.getElementById("login-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("error");
+  errorEl.textContent = "";
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+  try {
+    const resp = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data.detail || "Connexion impossible");
+    }
+    location.href = "/index.html";
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+</script>
+</body>
+</html>

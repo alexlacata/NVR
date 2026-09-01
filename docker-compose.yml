@@ -1,0 +1,20 @@
+services:
+  nvr:
+    build: .
+    container_name: nvr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      NVR_ADMIN_USERNAME: ${NVR_ADMIN_USERNAME:-admin}
+      NVR_ADMIN_PASSWORD: ${NVR_ADMIN_PASSWORD:?definissez un mot de passe dans .env}
+      NVR_SECRET_KEY: ${NVR_SECRET_KEY:?definissez une cle secrete dans .env}
+      NVR_RETENTION_DAYS: ${NVR_RETENTION_DAYS:-14}
+      NVR_MIN_FREE_DISK_PERCENT: ${NVR_MIN_FREE_DISK_PERCENT:-10}
+    volumes:
+      # Remplacez le chemin de gauche par le point de montage de votre
+      # disque dur, par ex. /mnt/disque-nvr:/data
+      - ${NVR_DISK_PATH:-./data}:/data
+    # Pour une camera USB, decommentez et adaptez :
+    # devices:
+    #   - /dev/video0:/dev/video0

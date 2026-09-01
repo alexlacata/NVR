@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NVR - Camera</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1><a href="/index.html" style="color:inherit">←</a> <span id="cam-title">Camera</span></h1>
+  <div class="actions">
+    <span id="cam-badge"></span>
+  </div>
+</div>
+<div class="container">
+  <div class="card">
+    <div class="video-wrap detail-video" id="video-wrap"></div>
+  </div>
+
+  <div class="section-title">Enregistrements</div>
+  <div class="row" style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+    <input type="date" id="date-filter" class="card" style="padding:8px 10px;background:var(--bg-elevated);color:var(--text);border:1px solid var(--border);border-radius:8px">
+    <button class="btn secondary" id="btn-today">Aujourd'hui</button>
+    <button class="btn secondary" id="btn-all">Tout afficher</button>
+  </div>
+  <div id="recordings"></div>
+
+  <div class="section-title">Parametres de la camera</div>
+  <div class="card">
+    <form class="form-grid" id="edit-form">
+      <div><label>Nom</label><input type="text" id="f-name"></div>
+      <div><label>Type de source</label>
+        <select id="f-type">
+          <option value="rtsp">RTSP (camera IP)</option>
+          <option value="http">HTTP / MJPEG</option>
+          <option value="usb">USB / peripherique local</option>
+          <option value="test">Test (mire synthetique)</option>
+        </select>
+      </div>
+      <div><label>URL du flux principal (enregistrement)</label><input type="text" id="f-url"></div>
+      <div><label>URL du flux secondaire (direct, optionnel)</label><input type="text" id="f-live-url"></div>
+      <div class="checkbox-row"><input type="checkbox" id="f-enabled"><label>Camera activee</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="f-record"><label>Enregistrer en continu</label></div>
+      <div class="error-msg" id="edit-error"></div>
+      <div class="actions">
+        <button type="submit" class="btn">Enregistrer</button>
+        <button type="button" class="btn danger" id="btn-delete">Supprimer la camera</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/js/hls.min.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const camId = params.get("id");
+if (!camId) location.href = "/index.html";
+
+let currentHls = null;
+
+function setBadge(state) {
+  const badge = document.getElementById("cam-badge");
+  badge.className = `badge ${state}`;
+  badge.innerHTML = "";
+  badge.appendChild(el("span", { class: "dot" }));
+  badge.appendChild(document.createTextNode(statusLabel(state)));
+}
+
+async function loadCamera() {
+  const cam = await apiJson(`/api/cameras/${encodeURIComponent(camId)}`);
+  document.getElementById("cam-title").textContent = cam.name;
+  document.title = `NVR - ${cam.name}`;
+  setBadge(cam.status.state);
+
+  const videoWrap = document.getElementById("video-wrap");
+  const wasPlaying = !!currentHls;
+  if (["running", "starting"].includes(cam.status.state)) {
+    if (!videoWrap.querySelector("video")) {
+      videoWrap.innerHTML = "";
+      const video = el("video", { controls: "", autoplay: "", muted: "", playsinline: "" });
+      videoWrap.appendChild(video);
+      currentHls = attachHls(video, `/api/cameras/${cam.id}/live/stream.m3u8`, () => {
+        videoWrap.innerHTML = "";
+        videoWrap.appendChild(el("div", { class: "offline" }, "Flux indisponible pour le moment"));
+      });
+    }
+  } else {
+    if (currentHls) { currentHls.destroy(); currentHls = null; }
+    videoWrap.innerHTML = "";
+    videoWrap.appendChild(el("div", { class: "offline" }, statusLabel(cam.status.state)));
+  }
+
+  document.getElementById("f-name").value = cam.name;
+  document.getElementById("f-type").value = cam.source_type;
+  document.getElementById("f-url").value = cam.url;
+  document.getElementById("f-live-url").value = cam.live_url || "";
+  document.getElementById("f-enabled").checked = cam.enabled;
+  document.getElementById("f-record").checked = cam.record;
+
+  return cam;
+}
+
+function groupByDate(items) {
+  const groups = {};
+  for (const item of items) {
+    (groups[item.date] = groups[item.date] || []).push(item);
+  }
+  return groups;
+}
+
+async function loadRecordings(date) {
+  const container = document.getElementById("recordings");
+  container.innerHTML = '<div class="spinner-row">Chargement...</div>';
+  const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+  const items = await apiJson(`/api/cameras/${encodeURIComponent(camId)}/recordings${qs}`);
+  container.innerHTML = "";
+  if (items.length === 0) {
+    container.appendChild(el("div", { class: "empty-state" }, "Aucun enregistrement pour cette periode."));
+    return;
+  }
+  const groups = groupByDate(items.reverse());
+  for (const [d, files] of Object.entries(groups)) {
+    const list = el("div", { class: "rec-list" });
+    files.forEach((f) => {
+      const playBtn = el("button", { class: "icon-btn", onclick: () => playRecording(f) }, "▶ Lire");
+      const dlLink = el("a", { class: "icon-btn", href: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}`, download: f.filename }, "⬇");
+      const delBtn = el("button", { class: "icon-btn", onclick: () => deleteRecording(f) }, "🗑");
+      list.appendChild(el("div", { class: "rec-item" }, [
+        el("span", {}, `${f.time} - ${fmtBytes(f.size_bytes)}`),
+        el("div", { class: "rec-actions" }, [playBtn, dlLink, delBtn]),
+      ]));
+    });
+    container.appendChild(el("div", { class: "rec-group" }, [
+      el("h3", {}, d),
+      list,
+    ]));
+  }
+}
+
+function playRecording(f) {
+  if (currentHls) { currentHls.destroy(); currentHls = null; }
+  const videoWrap = document.getElementById("video-wrap");
+  videoWrap.innerHTML = "";
+  const video = el("video", { controls: "", autoplay: "", playsinline: "", src: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}` });
+  videoWrap.appendChild(video);
+  videoWrap.scrollIntoView({ behavior: "smooth" });
+}
+
+async function deleteRecording(f) {
+  if (!confirm(`Supprimer l'enregistrement du ${f.date} ${f.time} ?`)) return;
+  await api(`/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}`, { method: "DELETE" });
+  await loadRecordings(document.getElementById("date-filter").value || null);
+}
+
+document.getElementById("btn-today").addEventListener("click", () => {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById("date-filter").value = today;
+  loadRecordings(today);
+});
+document.getElementById("btn-all").addEventListener("click", () => {
+  document.getElementById("date-filter").value = "";
+  loadRecordings(null);
+});
+document.getElementById("date-filter").addEventListener("change", (e) => loadRecordings(e.target.value || null));
+
+document.getElementById("edit-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("edit-error");
+  errorEl.textContent = "";
+  try {
+    await apiJson(`/api/cameras/${encodeURIComponent(camId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: document.getElementById("f-name").value,
+        source_type: document.getElementById("f-type").value,
+        url: document.getElementById("f-url").value,
+        live_url: document.getElementById("f-live-url").value || null,
+        enabled: document.getElementById("f-enabled").checked,
+        record: document.getElementById("f-record").checked,
+      }),
+    });
+    await loadCamera();
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
+document.getElementById("btn-delete").addEventListener("click", async () => {
+  if (!confirm("Supprimer definitivement cette camera ? Les enregistrements existants seront conserves sur le disque.")) return;
+  await api(`/api/cameras/${encodeURIComponent(camId)}`, { method: "DELETE" });
+  location.href = "/index.html";
+});
+
+(async () => {
+  await requireAuth();
+  await loadCamera();
+  await loadRecordings(new Date().toISOString().slice(0, 10));
+  document.getElementById("date-filter").value = new Date().toISOString().slice(0, 10);
+  setInterval(loadCamera, 15000);
+})();
+</script>
+</body>
+</html>

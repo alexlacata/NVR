@@ -1,0 +1,152 @@
+"""Builds ffmpeg command lines for the two per-camera pipelines:
+
+- "record": copies/encodes the stream into fixed-length fragmented-MP4
+  segment files on disk (the actual recording, for the hard drive). Keeps
+  audio when the source has it.
+- "live": copies/encodes the stream into an HLS playlist for near-real-time
+  viewing on a phone or computer browser. Video only, deliberately: many IP
+  cameras send audio in codecs (e.g. PCMU/PCMA) that browsers cannot decode
+  via Media Source Extensions at all, and pulling audio into the live leg
+  buys little for a surveillance live view while adding a real compatibility
+  risk and extra mobile-data bandwidth. Recordings keep the original audio.
+
+Two independent ffmpeg processes are used per camera (rather than a single
+`tee` process) so a real IP camera source is opened twice. Nearly all IP
+cameras support several concurrent RTSP sessions, and keeping the two
+pipelines independent makes failure handling and restarts much simpler.
+Use `live_url` (a camera's lower-resolution substream, if it has one) to
+keep the live pipeline lightweight.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+from app.models import Camera, SourceType
+
+
+@dataclass
+class InputSpec:
+    pre_args: list[str]
+    in_args: list[str]
+    video_map: list[str]
+    audio_map: Optional[list[str]]
+    copy_ok: bool
+
+
+def _input_spec(source_type: SourceType, url: str) -> InputSpec:
+    if source_type == SourceType.rtsp:
+        return InputSpec(
+            pre_args=["-rtsp_transport", "tcp", "-fflags", "+genpts"],
+            in_args=["-i", url],
+            video_map=["-map", "0:v:0"],
+            audio_map=["-map", "0:a:0?"],
+            copy_ok=True,
+        )
+    if source_type == SourceType.http:
+        return InputSpec(
+            pre_args=["-fflags", "+genpts"],
+            in_args=["-i", url],
+            video_map=["-map", "0:v:0"],
+            audio_map=None,
+            copy_ok=False,
+        )
+    if source_type == SourceType.usb:
+        return InputSpec(
+            pre_args=["-f", "v4l2", "-framerate", "25", "-video_size", "1280x720"],
+            in_args=["-i", url],
+            video_map=["-map", "0:v:0"],
+            audio_map=None,
+            copy_ok=False,
+        )
+    if source_type == SourceType.test:
+        return InputSpec(
+            pre_args=[],
+            in_args=[
+                "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=25",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100",
+            ],
+            video_map=["-map", "0:v"],
+            audio_map=["-map", "1:a"],
+            copy_ok=False,
+        )
+    raise ValueError(f"Unknown source type: {source_type}")
+
+
+def _video_codec_args(gop_seconds: int) -> list[str]:
+    return [
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-tune", "zerolatency",
+        "-pix_fmt", "yuv420p",
+        "-g", str(gop_seconds * 25),
+        "-r", "25",
+    ]
+
+
+_AUDIO_CODEC_ARGS = ["-c:a", "aac", "-b:a", "96k", "-ar", "44100"]
+
+
+def build_record_cmd(
+    ffmpeg_bin: str,
+    camera: Camera,
+    out_dir: Path,
+    segment_seconds: int,
+) -> list[str]:
+    spec = _input_spec(camera.source_type, camera.url)
+    maps = list(spec.video_map)
+    if spec.audio_map:
+        maps += spec.audio_map
+
+    if spec.copy_ok:
+        codec_args = ["-c", "copy"]
+    else:
+        codec_args = _video_codec_args(gop_seconds=2)
+        codec_args += _AUDIO_CODEC_ARGS if spec.audio_map else ["-an"]
+
+    out_pattern = str(out_dir / "%Y-%m-%d_%H-%M-%S.mp4")
+    return [
+        ffmpeg_bin, "-nostdin", "-hide_banner", "-loglevel", "warning",
+        *spec.pre_args,
+        *spec.in_args,
+        *maps,
+        *codec_args,
+        "-f", "segment",
+        "-segment_time", str(segment_seconds),
+        "-segment_format", "mp4",
+        "-segment_format_options", "movflags=+frag_keyframe+empty_moov+default_base_moof",
+        "-reset_timestamps", "1",
+        "-strftime", "1",
+        out_pattern,
+    ]
+
+
+def build_live_cmd(
+    ffmpeg_bin: str,
+    camera: Camera,
+    out_dir: Path,
+    hls_segment_seconds: int,
+    hls_list_size: int,
+) -> list[str]:
+    url = camera.live_url or camera.url
+    spec = _input_spec(camera.source_type, url)
+
+    codec_args = ["-c:v", "copy"] if spec.copy_ok else _video_codec_args(gop_seconds=hls_segment_seconds)
+
+    playlist = str(out_dir / "stream.m3u8")
+    segment_pattern = str(out_dir / "seg_%08d.ts")
+    return [
+        ffmpeg_bin, "-nostdin", "-hide_banner", "-loglevel", "warning",
+        *spec.pre_args,
+        *spec.in_args,
+        *spec.video_map,
+        *codec_args,
+        "-f", "hls",
+        "-hls_time", str(hls_segment_seconds),
+        "-hls_list_size", str(hls_list_size),
+        "-hls_flags", "delete_segments+independent_segments",
+        "-hls_segment_type", "mpegts",
+        "-hls_segment_filename", segment_pattern,
+        playlist,
+    ]
