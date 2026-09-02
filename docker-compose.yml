@@ -11,6 +11,12 @@ services:
       NVR_SECRET_KEY: ${NVR_SECRET_KEY:?definissez une cle secrete dans .env}
       NVR_RETENTION_DAYS: ${NVR_RETENTION_DAYS:-14}
       NVR_MIN_FREE_DISK_PERCENT: ${NVR_MIN_FREE_DISK_PERCENT:-10}
+      # Mettez a true si NVR_DISK_PATH ci-dessous est un partage reseau
+      # monte (ex. disque sur le port USB d'un Peplink) : le service
+      # refuse alors de demarrer tant que le montage n'est pas pret, au
+      # lieu de recreer silencieusement le dossier en local. Voir le
+      # README, section "Ou brancher le disque dur ?".
+      NVR_REQUIRE_EXISTING_DATA_DIR: ${NVR_REQUIRE_EXISTING_DATA_DIR:-false}
     volumes:
       # Remplacez le chemin de gauche par le point de montage de votre
       # disque dur, par ex. /mnt/disque-nvr:/data

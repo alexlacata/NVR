@@ -27,6 +27,12 @@ html, body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
+}
+
+.btn, .icon-btn, a {
+  touch-action: manipulation; /* removes the ~300ms tap delay on mobile browsers */
 }
 
 a { color: var(--accent); text-decoration: none; }

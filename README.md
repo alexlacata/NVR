@@ -18,7 +18,12 @@ un navigateur web.
   quelques secondes de latence, compatible navigateur mobile/desktop sans
   application) et relecture des enregistrements, avec téléchargement.
 - **Redémarrage automatique** des flux en cas de coupure caméra ou réseau.
-- **Authentification** simple par identifiant/mot de passe, session signée.
+- **Comptes utilisateurs** avec rôles administrateur/lecteur, session signée,
+  et gestion des comptes et des réglages serveur directement depuis l'UI.
+- **Interface mobile/PC fluide** : web app installable sur l'écran d'accueil
+  (iOS/Android) pour un usage plein écran sans barre d'adresse, et un QR
+  code dans les Paramètres pour ouvrir l'interface sur un téléphone sans
+  taper l'adresse du serveur.
 - **Caméras PTZ** : pilotage pan/tilt/zoom et préréglages (presets) via
   ONVIF, directement depuis le téléphone.
 - **Bande passante maîtrisée pour le direct** : bitrate et résolution du
@@ -221,6 +226,18 @@ effet et la gestion des comptes se fait entièrement depuis la page
 
 - **Sur le même réseau Wi-Fi** : ouvrez `http://<ip-locale-du-serveur>:8000`
   dans le navigateur du téléphone.
+- **En scannant un QR code** : une fois connecté depuis un premier appareil,
+  ouvrez **Paramètres → Accéder depuis un téléphone** : un QR code y encode
+  l'adresse du serveur telle que vue par ce navigateur (IP locale, nom
+  Tailscale, domaine derrière un reverse proxy...). Scannez-le avec
+  l'appareil photo du téléphone pour ouvrir directement l'interface, sans
+  taper l'adresse à la main.
+- **Ajout à l'écran d'accueil (iOS/Android)** : l'interface est une
+  [web app installable](https://developer.mozilla.org/fr/docs/Web/Progressive_web_apps)
+  (icône + mode plein écran sans barre d'adresse). Sur iOS : Safari →
+  Partager → *Sur l'écran d'accueil*. Sur Android : Chrome propose
+  *Ajouter à l'écran d'accueil* / *Installer l'application* dans son menu.
+  Une fois ajoutée, l'icône NVR s'ouvre en plein écran comme une app.
 - **À distance (hors du domicile)** : n'exposez pas ce service directement
   sur Internet sans précaution. La façon la plus simple et la plus sûre est
   d'installer un VPN personnel comme [Tailscale](https://tailscale.com/) ou
@@ -269,11 +286,61 @@ caméras sur la 4G pour pouvoir enregistrer.
    donner plus de marge (fenêtre de rattrapage plus longue) au prix d'un
    direct légèrement moins "temps réel".
 
+### Où brancher le disque dur ?
+
+Deux topologies possibles selon où vit le disque dur physiquement :
+
+- **Disque branché sur la machine qui fait tourner le NVR (recommandé)** :
+  un mini PC, un NAS ou un Raspberry Pi sur le même site que les caméras et
+  le Peplink, avec le disque en USB/SATA local (`NVR_DISK_PATH` pointe
+  directement dessus). Le Peplink ne sert alors que de liaison réseau/4G,
+  jamais de stockage. C'est la topologie la plus simple et la plus fiable
+  (écriture disque locale, aucune dépendance réseau pour enregistrer), et
+  celle décrite dans les sections *Démarrage rapide* ci-dessus.
+- **Disque branché sur le port USB du Peplink lui-même** (certains modèles
+  exposent leur port USB comme partage réseau SMB/NFS) : possible, mais le
+  Peplink ne fait pas tourner le NVR — vous avez toujours besoin d'une
+  machine séparée (mini PC/NAS/Raspberry Pi) qui monte ce partage réseau au
+  niveau du système d'exploitation, puis pointe `NVR_DISK_PATH` sur ce point
+  de montage. Concrètement, sur la machine qui fait tourner le NVR :
+  1. Montez le partage exposé par le Peplink comme n'importe quel partage
+     réseau, par ex. via `/etc/fstab` (Linux) :
+     ```
+     //192.168.50.1/nvr-disk /mnt/peplink-disk cifs credentials=/root/.peplink-creds,_netdev,x-systemd.automount,vers=3.0,uid=1000,gid=1000 0 0
+     ```
+     (`_netdev`/`x-systemd.automount` évitent que le montage bloque le
+     démarrage si le Peplink n'est pas encore joignable ; adaptez `vers=`
+     et les identifiants à votre modèle - certains Peplink parlent NFS au
+     lieu de SMB/CIFS.)
+  2. Pointez `NVR_DISK_PATH` (Docker) ou `NVR_DATA_DIR` (sans Docker) sur
+     ce point de montage (`/mnt/peplink-disk` ci-dessus) - l'application ne
+     voit alors qu'un dossier normal, elle n'a pas besoin de savoir que
+     c'est un partage réseau.
+  3. **Important** : passez `NVR_REQUIRE_EXISTING_DATA_DIR=true`. Sans ça,
+     si le service démarre avant que le montage réseau soit prêt (ordre de
+     démarrage, Peplink qui redémarre...), le dossier serait simplement
+     recréé vide en local et le NVR enregistrerait silencieusement sur le
+     disque local au lieu du partage - vos enregistrements sembleraient
+     fonctionner mais ne seraient pas là où vous les cherchez, et
+     réapparaîtraient masqués sous le point de montage une fois celui-ci
+     rétabli. Avec cette option, le service refuse de démarrer tant que le
+     point de montage n'existe pas réellement (Docker `restart:
+     unless-stopped` le fait alors retenter automatiquement).
+  4. Gardez à l'esprit qu'un enregistrement continu (écriture ffmpeg toutes
+     les quelques secondes) est plus exigeant pour un partage réseau qu'un
+     usage fichiers occasionnel : préférez un lien filaire stable entre le
+     NVR et le Peplink, surveillez l'état `Erreur` des caméras (symptôme
+     d'écritures qui échouent), et si la fiabilité n'est pas suffisante,
+     revenez à la première topologie (disque local) et utilisez plutôt le
+     partage Peplink pour de l'archivage ponctuel, pas l'enregistrement
+     continu.
+
 ## Configuration (variables d'environnement)
 
 | Variable | Défaut | Description |
 |---|---|---|
 | `NVR_DATA_DIR` | `data` | Dossier racine (enregistrements, config, HLS) |
+| `NVR_REQUIRE_EXISTING_DATA_DIR` | `false` | Si `true`, refuse de demarrer tant que `NVR_DATA_DIR` n'existe pas deja au lieu de le creer - a activer quand `NVR_DATA_DIR` est un partage reseau monte (ex. disque sur le port USB d'un Peplink), voir *Ou brancher le disque dur ?* ci-dessus |
 | `NVR_ADMIN_USERNAME` | `admin` | Identifiant du premier compte administrateur, créé **une seule fois** au tout premier démarrage (sans effet ensuite — voir *Comptes utilisateurs et paramètres serveur*) |
 | `NVR_ADMIN_PASSWORD` | `changeme` | Mot de passe du premier compte administrateur (**à changer**, idem) |
 | `NVR_SECRET_KEY` | *(généré et conservé automatiquement)* | Clé de signature des sessions |
@@ -311,6 +378,9 @@ app/
   ptz_registry.py        cache des clients PTZ par caméra
   api/                 routes FastAPI (auth, utilisateurs, paramètres, caméras, médias, PTZ, ONVIF, système)
   static/              interface web (HTML/CSS/JS, sans build)
+    manifest.json        manifeste PWA (icone + mode plein ecran a l'ajout sur l'ecran d'accueil)
+    icons/                icones de l'app (favicon, apple-touch-icon, icones PWA)
+    js/qrcode.min.js       generateur de QR code cote client (vendored, sans dependance externe)
 tests/                 tests automatisés (pytest)
 ```
 

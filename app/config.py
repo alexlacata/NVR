@@ -12,8 +12,22 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="NVR_", extra="ignore")
 
     # Root directory where all persistent data lives. Point this at your
-    # mounted hard drive, e.g. /mnt/nvr-disk.
+    # mounted hard drive, e.g. /mnt/nvr-disk - whether that's a drive
+    # plugged directly into this machine, or a network share (SMB/NFS)
+    # mounted at the OS level, e.g. one exposed by a Peplink router's USB
+    # port. Either way this is just treated as a plain directory.
     data_dir: Path = Path("data")
+
+    # When data_dir is meant to be a mount point (typically a network
+    # share), a boot-order race can leave it un-mounted when the app
+    # starts: mkdir() below would then silently create an empty local
+    # directory instead of failing, the app would happily start recording
+    # onto local disk, and once the real share mounts later it hides those
+    # local files underneath it (they're still there, just inaccessible
+    # until the share is unmounted again) - a classic, hard-to-notice way
+    # to "lose" recordings. Set this to true to instead refuse to start
+    # until data_dir already exists (i.e. until the share is mounted).
+    require_existing_data_dir: bool = False
 
     # Auth. admin_username/admin_password only seed the initial admin
     # account the first time the server starts (when no users exist yet) -
@@ -80,6 +94,13 @@ class Settings(BaseSettings):
         return self.config_dir / "secret_key"
 
     def ensure_dirs(self) -> None:
+        if self.require_existing_data_dir and not self.data_dir.is_dir():
+            raise RuntimeError(
+                f"NVR_REQUIRE_EXISTING_DATA_DIR est actif et {self.data_dir} n'existe pas encore. "
+                "Si data_dir est un partage reseau (SMB/NFS, ex. un disque expose par un routeur "
+                "Peplink), c'est probablement qu'il n'est pas encore monte - verifiez le montage "
+                "(systemd .mount/automount ou /etc/fstab) avant de relancer le service."
+            )
         for d in (self.data_dir, self.config_dir, self.recordings_dir, self.hls_dir, self.thumbnails_dir):
             d.mkdir(parents=True, exist_ok=True)
 
