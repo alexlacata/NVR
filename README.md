@@ -105,6 +105,93 @@ export NVR_SECRET_KEY=$(openssl rand -hex 32)
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+## Déploiement sur Raspberry Pi
+
+Le NVR tourne tel quel sur un Raspberry Pi : l'image Docker
+(`python:3.11-slim`) est multi-architecture (arm64 inclus) et `ffmpeg`
+s'installe normalement via `apt` sur Raspberry Pi OS — aucune adaptation du
+code n'est nécessaire.
+
+1. **Matériel recommandé** : Raspberry Pi 4 ou 5 (4 Go de RAM ou plus),
+   **Raspberry Pi OS Lite 64 bits** (pas la version 32 bits — Docker y est
+   moins bien supporté, et vous perdez la moitié de la RAM adressable).
+2. **Stockage : privilégiez un SSD USB3 à une carte micro-SD.** Un
+   enregistrement continu représente une écriture quasi permanente ; une
+   carte SD s'use et devient plus lente à cet usage, alors qu'un SSD tient
+   dans la durée. Voir *Où brancher le disque dur ?* plus haut pour le cas
+   d'un disque exposé par un routeur Peplink ; pour un SSD branché
+   directement en USB sur le Pi, il suffit de le monter (`/etc/fstab`) et
+   de pointer `NVR_DISK_PATH` (Docker) ou `NVR_DATA_DIR` dessus. Le Pi 4/5
+   peut aussi **démarrer directement depuis ce SSD USB** (pas de carte SD
+   du tout) — voir *Créer une image prête à flasher* ci-dessous.
+3. **Installer Docker** (Raspberry Pi OS Lite, une seule fois) :
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER   # puis reconnectez-vous
+   sudo apt install -y docker-compose-plugin
+   ```
+4. **Suivre le démarrage rapide Docker** ci-dessus tel quel (`git clone`,
+   `.env`, `docker compose up -d --build`) — rien de spécifique au Pi dans
+   le `docker-compose.yml`.
+
+**Charge CPU** : l'enregistrement copie le flux caméra tel quel sur le
+disque (`-c copy`, pas de ré-encodage) dès que la caméra le permet — un Pi
+peut donc enregistrer plusieurs caméras en continu sans effort notable,
+même en 1080p, l'essentiel du travail étant de l'écriture disque, pas du
+calcul. Le direct fait de même *sauf* si vous configurez une limite de
+bitrate/résolution (section *Bande passante du direct*, pensée pour une
+liaison 4G) : dans ce cas ce flux est ré-encodé en logiciel (x264), ce qui
+consomme du CPU. Laissez cette limite vide pour un visionnage sur réseau
+local (le direct reste alors une simple copie, comme l'enregistrement), et
+n'activez-la que pour les caméras réellement consultées à distance sur une
+liaison limitée.
+
+### Créer une image prête à flasher (boîtier NVR qui démarre sur son disque)
+
+Pour un boîtier dédié qui démarre directement sur son disque d'enregistrement
+(sans carte micro-SD), utilisez l'outil officiel **Raspberry Pi Imager**
+(https://www.raspberrypi.com/software/) : il sait flasher un SSD/HDD USB
+exactement comme une carte SD, et le Pi 4/5 peut démarrer directement dessus.
+
+1. **Flasher l'OS sur le disque, pas sur une carte SD** :
+   - Branchez le SSD/HDD en USB3 sur votre ordinateur.
+   - Dans Raspberry Pi Imager : choisissez l'appareil (Pi 4/5), l'OS
+     **Raspberry Pi OS Lite (64 bits)**, puis comme support de stockage
+     **sélectionnez le SSD/HDD USB** dans la liste (pas la carte SD — c'est
+     bien ce disque-là qui deviendra le disque de boot *et* de stockage des
+     enregistrements).
+   - Cliquez sur l'icône ⚙️ **Options avancées** avant de flasher, pour
+     activer SSH et prédéfinir : nom d'hôte, utilisateur/mot de passe, et
+     le Wi-Fi si vous n'utilisez pas Ethernet. Cela évite de brancher un
+     écran/clavier sur le Pi.
+   - Flashez, puis rebranchez le disque sur le Pi et démarrez-le (Pi 5 :
+     démarrage USB actif par défaut ; Pi 4 : si besoin, activez d'abord le
+     démarrage USB depuis une carte SD temporaire avec `raspi-config` →
+     *Advanced Options* → *Boot Order*, une opération à ne faire qu'une
+     fois — voir la documentation Raspberry Pi si votre Pi 4 est ancien).
+2. **Se connecter en SSH** une fois le Pi démarré (adresse IP visible sur
+   votre routeur, ou `raspberrypi.local` si mDNS fonctionne) :
+   ```bash
+   ssh <utilisateur>@<ip-du-pi>
+   ```
+3. **Lancer le script de provisionnement**, qui installe Docker, clone ce
+   dépôt, crée `.env` (avec une clé secrète générée automatiquement),
+   prépare le point de montage du disque d'enregistrement, et active un
+   service systemd pour que le NVR redémarre automatiquement avec le
+   système :
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/pi-image/firstboot.sh \
+     | bash -s -- https://github.com/<owner>/<repo>.git
+   ```
+   (remplacez `<owner>/<repo>` par ce dépôt). Le script affiche à la fin
+   l'adresse `http://<ip-du-pi>:8000` de l'interface. Pensez ensuite à
+   changer `NVR_ADMIN_PASSWORD` dans `~/nvr/.env` puis à relancer
+   `docker compose up -d` (ou simplement re-exécuter le script, il est
+   conçu pour être relancé sans risque après un `git pull`).
+   Le script est aussi disponible dans ce dépôt sous `pi-image/firstboot.sh`
+   si vous préférez cloner puis l'exécuter localement (`bash
+   pi-image/firstboot.sh`).
+
 ## Ajouter une caméra
 
 Dans l'interface, cliquez sur **+ Camera** et renseignez :
@@ -450,6 +537,8 @@ app/
     icons/                icones de l'app (favicon, apple-touch-icon, icones PWA)
     js/qrcode.min.js       generateur de QR code cote client (vendored, sans dependance externe)
 tests/                 tests automatisés (pytest)
+pi-image/
+  firstboot.sh          script de provisionnement (Docker, clonage, .env, service systemd) pour un Raspberry Pi qui démarre sur son disque
 ```
 
 ## Tests
