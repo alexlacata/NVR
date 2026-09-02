@@ -705,11 +705,24 @@ document.getElementById("date-filter").addEventListener("change", (e) => {
   loadTimeline(e.target.value || null);
 });
 
+// Parses an optional integer field: empty stays null (unlimited/default),
+// but anything non-empty that isn't a whole number is rejected instead of
+// silently turning into null (JSON.stringify(NaN) === "null", so a typo
+// like "8oo" would otherwise be sent - and accepted - as "no limit").
+function parseOptionalIntField(id, label) {
+  const raw = document.getElementById(id).value.trim();
+  if (!raw) return null;
+  if (!/^\d+$/.test(raw)) throw new Error(`${label} : doit etre un nombre entier.`);
+  return parseInt(raw, 10);
+}
+
 document.getElementById("edit-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const errorEl = document.getElementById("edit-error");
   errorEl.textContent = "";
   try {
+    const liveMaxBitrateKbps = parseOptionalIntField("f-bitrate", "Bitrate maximum du direct");
+    const thumbnailIntervalSeconds = parseOptionalIntField("f-thumb-interval", "Intervalle entre deux vignettes");
     await apiJson(`/api/cameras/${encodeURIComponent(camId)}`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -719,9 +732,9 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         live_url: document.getElementById("f-live-url").value || null,
         enabled: document.getElementById("f-enabled").checked,
         record: document.getElementById("f-record").checked,
-        live_max_bitrate_kbps: document.getElementById("f-bitrate").value ? parseInt(document.getElementById("f-bitrate").value, 10) : null,
+        live_max_bitrate_kbps: liveMaxBitrateKbps,
         live_scale: document.getElementById("f-scale").value || null,
-        thumbnail_interval_seconds: document.getElementById("f-thumb-interval").value ? parseInt(document.getElementById("f-thumb-interval").value, 10) : null,
+        thumbnail_interval_seconds: thumbnailIntervalSeconds,
         ptz_enabled: document.getElementById("f-ptz-enabled").checked,
         onvif_url: document.getElementById("f-onvif-url").value || null,
         onvif_username: document.getElementById("f-onvif-user").value || null,

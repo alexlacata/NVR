@@ -285,22 +285,30 @@ document.getElementById("server-form").addEventListener("submit", async (ev) => 
   ev.preventDefault();
   const errorEl = document.getElementById("server-error");
   errorEl.textContent = "";
-  const num = (id) => {
+  // Empty stays null (no change / use default), but non-empty garbage is
+  // rejected instead of silently becoming null - every field below is
+  // Optional server-side, so Number("abc") -> NaN -> JSON "null" would
+  // otherwise be accepted as "no change" with zero feedback to the admin.
+  const num = (id, label, { float = false } = {}) => {
     const v = document.getElementById(id).value.trim();
-    return v ? Number(v) : null;
+    if (!v) return null;
+    if (!(float ? /^\d+(\.\d+)?$/ : /^\d+$/).test(v)) {
+      throw new Error(`${label} : doit etre un nombre${float ? "" : " entier"}.`);
+    }
+    return Number(v);
   };
   try {
     await apiJson("/api/settings", {
       method: "PATCH",
       body: JSON.stringify({
-        retention_days: num("s-retention-days"),
-        min_free_disk_percent: num("s-min-free-disk"),
-        segment_seconds: num("s-segment-seconds"),
-        hls_segment_seconds: num("s-hls-segment-seconds"),
-        hls_list_size: num("s-hls-list-size"),
-        thumbnail_interval_seconds: num("s-thumb-interval"),
-        thumbnail_check_interval_seconds: num("s-thumb-check-interval"),
-        retention_check_interval_seconds: num("s-retention-check-interval"),
+        retention_days: num("s-retention-days", "Retention des enregistrements"),
+        min_free_disk_percent: num("s-min-free-disk", "Espace disque libre minimum", { float: true }),
+        segment_seconds: num("s-segment-seconds", "Duree d'un fichier d'enregistrement"),
+        hls_segment_seconds: num("s-hls-segment-seconds", "Taille des segments HLS"),
+        hls_list_size: num("s-hls-list-size", "Segments HLS conserves dans la playlist"),
+        thumbnail_interval_seconds: num("s-thumb-interval", "Intervalle des vignettes par defaut"),
+        thumbnail_check_interval_seconds: num("s-thumb-check-interval", "Frequence de verification des vignettes"),
+        retention_check_interval_seconds: num("s-retention-check-interval", "Frequence de verification de la retention"),
       }),
     });
     toast("Parametres enregistres");
