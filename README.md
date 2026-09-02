@@ -199,6 +199,25 @@ vignettes ne coûtent aucune bande passante caméra supplémentaire : elles
 sont extraites localement des fichiers déjà enregistrés, jamais d'une
 connexion en direct.
 
+## Programmer l'enregistrement (préréglages horaires)
+
+Par défaut, une caméra enregistre en continu tant que **Enregistrer** est
+coché. Sur la page de la caméra (section *Programmation de l'enregistrement*,
+réservée aux comptes avec la permission *Gérer les caméras*), vous pouvez
+restreindre l'enregistrement à certaines plages horaires avec une grille
+7 jours x 24 heures :
+
+- **Presets** : *Toujours*, *Jour (7h-20h)*, *Nuit (20h-7h)*, *Jours ouvrés
+  8h-18h*, *Jamais (pause)* — un clic remplit toute la grille.
+- **Personnalisé** : cliquez une case pour la basculer, ou cliquez-glissez
+  pour en peindre plusieurs d'un coup (même geste que la ligne du temps).
+
+Le direct (HLS, visionnage) n'est jamais concerné par cette programmation —
+seul l'enregistrement sur disque s'arrête/reprend aux heures choisies,
+vérifié chaque minute. C'est un réglage indépendant de **Enregistrer** :
+les deux doivent être « oui » pour que l'enregistrement ait lieu à un
+instant donné (grille vide = pas de restriction, comportement historique).
+
 ## Détection de mouvement, sensibilité et zones de masquage
 
 Sur la page de la caméra (section *Paramètres de la caméra*, réservée aux
@@ -235,7 +254,8 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
   un compte, et — pour un compte **Lecteur** — cocher précisément ce qu'il a
   le droit de faire :
   - `Gérer les caméras` : ajouter/modifier/supprimer une caméra, assistant
-    ONVIF/marque, réglages de détection de mouvement.
+    ONVIF/marque, programmation de l'enregistrement, réglages de détection
+    de mouvement.
   - `Piloter le PTZ` : coché par défaut pour un nouveau lecteur (comportement
     historique) ; décochable si vous voulez un compte strictement
     visionnage.
@@ -418,6 +438,7 @@ app/
   recordings.py         nommage/parcours des segments enregistrés (partagé)
   thumbnails.py          extraction des vignettes depuis les segments termines
   motion.py               detection de mouvement (diff d'image bas niveau, sans dependance lourde)
+  recording_schedule.py   demarre/arrete l'enregistrement selon la grille horaire de chaque camera
   auth.py              authentification par session + comptes (bootstrap, vérification)
   deps.py                dépendances FastAPI (require_auth, require_admin)
   onvif_client.py        client ONVIF (PTZ + decouverte des flux media)

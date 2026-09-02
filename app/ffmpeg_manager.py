@@ -5,12 +5,13 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from app.config import Settings
 from app.ffmpeg_cmd import build_live_cmd, build_record_cmd
-from app.models import Camera, CameraStatus
+from app.models import Camera, CameraStatus, schedule_allows_recording
 
 logger = logging.getLogger("nvr.ffmpeg")
 
@@ -222,7 +223,7 @@ class StreamManager:
         self._legs[camera.id] = legs
         if camera.enabled:
             live_leg.start()
-            if camera.record:
+            if camera.record and schedule_allows_recording(camera, datetime.now()):
                 record_leg.start()
 
     def _sync_camera_state(self, camera: Camera) -> None:
@@ -231,13 +232,33 @@ class StreamManager:
             return
         if camera.enabled:
             legs["live"].start()
-            if camera.record:
+            if camera.record and schedule_allows_recording(camera, datetime.now()):
                 legs["record"].start()
             else:
                 asyncio.create_task(legs["record"].stop())
         else:
             asyncio.create_task(legs["live"].stop())
             asyncio.create_task(legs["record"].stop())
+
+    def sync_recording_schedule(self, cameras: list[Camera], now: Optional[datetime] = None) -> None:
+        """Starts/stops just the record leg for cameras with a weekly
+        timer (record_schedule), so recording turns on/off at hour
+        boundaries without waiting for an unrelated config change to
+        trigger reconcile(). Called periodically (see
+        app.recording_schedule.recording_schedule_loop); a no-op for
+        cameras without a schedule, since reconcile()/_sync_camera_state
+        already keep those in the right state as soon as they're touched."""
+        now = now or datetime.now()
+        for camera in cameras:
+            if not camera.record_schedule:
+                continue
+            legs = self._legs.get(camera.id)
+            if not legs or not camera.enabled:
+                continue
+            if camera.record and schedule_allows_recording(camera, now):
+                legs["record"].start()
+            else:
+                asyncio.create_task(legs["record"].stop())
 
     async def _stop_camera(self, camera_id: str) -> None:
         legs = self._legs.pop(camera_id, None)

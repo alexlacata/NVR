@@ -24,6 +24,7 @@ from app.config import get_settings
 from app.ffmpeg_manager import StreamManager
 from app.motion import MotionRegistry, motion_loop
 from app.ptz_registry import PTZRegistry
+from app.recording_schedule import recording_schedule_loop
 from app.retention import retention_loop
 from app.settings_store import SettingsStore
 from app.store import CameraStore
@@ -59,6 +60,9 @@ async def lifespan(app: FastAPI):
     retention_task = asyncio.create_task(retention_loop(settings, stop_event))
     thumbnail_task = asyncio.create_task(thumbnail_loop(settings, app.state.store, stop_event))
     motion_task = asyncio.create_task(motion_loop(settings, app.state.store, app.state.motion_registry, stop_event))
+    schedule_task = asyncio.create_task(
+        recording_schedule_loop(app.state.store, app.state.stream_manager, stop_event)
+    )
 
     try:
         yield
@@ -67,6 +71,7 @@ async def lifespan(app: FastAPI):
         await retention_task
         await thumbnail_task
         await motion_task
+        await schedule_task
         await app.state.stream_manager.stop_all()
 
 

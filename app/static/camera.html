@@ -73,7 +73,20 @@
       <div><label>URL du flux principal (enregistrement)</label><input type="text" id="f-url"></div>
       <div><label>URL du flux secondaire (direct, optionnel)</label><input type="text" id="f-live-url"></div>
       <div class="checkbox-row"><input type="checkbox" id="f-enabled"><label>Camera activee</label></div>
-      <div class="checkbox-row"><input type="checkbox" id="f-record"><label>Enregistrer en continu</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="f-record"><label>Enregistrer</label></div>
+
+      <div class="section-title" style="margin-top:10px">Programmation de l'enregistrement</div>
+      <div class="hint">Laissez vide pour un enregistrement continu tant que "Enregistrer" est coche.
+        Sinon, choisissez un preset ou cliquez (glissez pour peindre plusieurs cases) sur la grille pour
+        n'enregistrer qu'a certaines heures.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
+        <button type="button" class="btn secondary" id="sched-always">Toujours</button>
+        <button type="button" class="btn secondary" id="sched-day">Jour (7h-20h)</button>
+        <button type="button" class="btn secondary" id="sched-night">Nuit (20h-7h)</button>
+        <button type="button" class="btn secondary" id="sched-workweek">Jours ouvres 8h-18h</button>
+        <button type="button" class="btn secondary" id="sched-clear">Jamais (pause)</button>
+      </div>
+      <div id="schedule-editor" class="schedule-editor"></div>
 
       <div class="section-title" style="margin-top:10px">Bande passante du direct (4G / liaison limitee)</div>
       <div class="row">
@@ -200,7 +213,10 @@ async function loadCamera() {
   document.getElementById("f-motion-sensitivity").value = cam.motion_sensitivity;
   document.getElementById("motion-sensitivity-val").textContent = cam.motion_sensitivity;
   updateMotionFieldsVisibility();
-  if (hasPermission("cameras_manage")) buildMotionMaskEditor(cam);
+  if (hasPermission("cameras_manage")) {
+    buildMotionMaskEditor(cam);
+    buildScheduleEditor(cam);
+  }
 
   renderPtzPanel(cam);
 
@@ -255,6 +271,94 @@ function buildMotionMaskEditor(cam) {
     editor.appendChild(cell);
   }
 }
+
+// --- Recording schedule: a 7 (days, Monday first) x 24 (hours) grid,
+// matching SCHEDULE_DAYS/SCHEDULE_HOURS server-side (app/models.py).
+// Click toggles one cell; press-and-drag "paints" every cell the pointer
+// passes over to the same value as the first cell touched, like the
+// timeline scrubber's pointer handling above.
+const SCHEDULE_DAYS = 7, SCHEDULE_HOURS = 24;
+const SCHEDULE_DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+let recordSchedule = new Array(SCHEDULE_DAYS * SCHEDULE_HOURS).fill(false);
+let scheduleEditorBuilt = false;
+let scheduleCells = [];
+
+function applySchedulePreset(build) {
+  recordSchedule = new Array(SCHEDULE_DAYS * SCHEDULE_HOURS).fill(false);
+  for (let day = 0; day < SCHEDULE_DAYS; day++) {
+    for (let hour = 0; hour < SCHEDULE_HOURS; hour++) {
+      if (build(day, hour)) recordSchedule[day * SCHEDULE_HOURS + hour] = true;
+    }
+  }
+  scheduleCells.forEach((cell, i) => cell.classList.toggle("on", recordSchedule[i]));
+}
+
+function buildScheduleEditor(cam) {
+  if (scheduleEditorBuilt) return; // avoid rebuilding (and losing unsaved edits) on every poll
+  scheduleEditorBuilt = true;
+  const cellCount = SCHEDULE_DAYS * SCHEDULE_HOURS;
+  // An empty record_schedule means "no restriction" (continuous recording
+  // whenever "Enregistrer" is checked) - shown as every hour selected,
+  // which is what that actually means in practice.
+  recordSchedule = (Array.isArray(cam.record_schedule) && cam.record_schedule.length === cellCount)
+    ? cam.record_schedule.slice()
+    : new Array(cellCount).fill(true);
+  scheduleCells = [];
+
+  const editor = document.getElementById("schedule-editor");
+  editor.innerHTML = "";
+  const grid = el("div", { class: "schedule-grid" });
+  grid.appendChild(el("div", {})); // corner cell, above day labels
+  for (let hour = 0; hour < SCHEDULE_HOURS; hour++) {
+    grid.appendChild(el("div", { class: "schedule-hour-label" }, hour % 3 === 0 ? String(hour) : ""));
+  }
+
+  let dragging = false, paintValue = true;
+  const setCell = (i, on) => { recordSchedule[i] = on; scheduleCells[i].classList.toggle("on", on); };
+  const cellAt = (ev) => {
+    const el2 = document.elementFromPoint(ev.clientX, ev.clientY);
+    return el2 && el2.classList.contains("schedule-cell") ? el2 : null;
+  };
+
+  for (let day = 0; day < SCHEDULE_DAYS; day++) {
+    grid.appendChild(el("div", { class: "schedule-day-label" }, SCHEDULE_DAY_LABELS[day]));
+    for (let hour = 0; hour < SCHEDULE_HOURS; hour++) {
+      const i = day * SCHEDULE_HOURS + hour;
+      const cell = el("button", {
+        type: "button",
+        class: "schedule-cell" + (recordSchedule[i] ? " on" : ""),
+        title: `${SCHEDULE_DAY_LABELS[day]} ${hour}h-${hour + 1}h`,
+        onpointerdown: (ev) => {
+          ev.preventDefault();
+          dragging = true;
+          paintValue = !recordSchedule[i];
+          setCell(i, paintValue);
+          try { cell.setPointerCapture(ev.pointerId); } catch (e) {}
+        },
+        onpointerenter: () => { if (dragging) setCell(i, paintValue); },
+        onpointermove: (ev) => {
+          if (!dragging) return;
+          const target = cellAt(ev);
+          if (target && target !== cell) {
+            const idx = scheduleCells.indexOf(target);
+            if (idx !== -1) setCell(idx, paintValue);
+          }
+        },
+        onpointerup: () => { dragging = false; },
+        onpointercancel: () => { dragging = false; },
+      });
+      scheduleCells.push(cell);
+      grid.appendChild(cell);
+    }
+  }
+  editor.appendChild(grid);
+}
+
+document.getElementById("sched-always").addEventListener("click", () => applySchedulePreset(() => true));
+document.getElementById("sched-clear").addEventListener("click", () => applySchedulePreset(() => false));
+document.getElementById("sched-day").addEventListener("click", () => applySchedulePreset((d, h) => h >= 7 && h < 20));
+document.getElementById("sched-night").addEventListener("click", () => applySchedulePreset((d, h) => h >= 20 || h < 7));
+document.getElementById("sched-workweek").addEventListener("click", () => applySchedulePreset((d, h) => d <= 4 && h >= 8 && h < 18));
 
 async function refreshMotionBadge() {
   const badge = document.getElementById("motion-badge");
@@ -623,6 +727,7 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         motion_enabled: document.getElementById("f-motion-enabled").checked,
         motion_sensitivity: parseInt(document.getElementById("f-motion-sensitivity").value, 10),
         motion_mask_grid: motionMaskGrid,
+        record_schedule: recordSchedule,
       }),
     });
     await loadCamera();

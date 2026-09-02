@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -34,6 +35,12 @@ MOTION_GRID_COLS = 8
 MOTION_GRID_ROWS = 6
 MOTION_GRID_CELLS = MOTION_GRID_COLS * MOTION_GRID_ROWS
 
+# Weekly recording schedule grid: 7 days (Monday=0 .. Sunday=6) x 24 hours,
+# row-major (day * 24 + hour), true = record during that hour.
+SCHEDULE_DAYS = 7
+SCHEDULE_HOURS = 24
+SCHEDULE_CELLS = SCHEDULE_DAYS * SCHEDULE_HOURS
+
 
 class CameraBase(BaseModel):
     # Needed so the ptz_enabled -> onvif_url cross-field check below also
@@ -50,6 +57,18 @@ class CameraBase(BaseModel):
     live_url: Optional[str] = Field(default=None, max_length=2000)
     enabled: bool = True
     record: bool = True
+    # Optional weekly timer restricting *when* `record` actually records:
+    # empty = record continuously whenever `record` is true (prior
+    # behavior); otherwise exactly SCHEDULE_CELLS booleans (see
+    # schedule_allows_recording below), true = record during that hour.
+    record_schedule: list[bool] = Field(default_factory=list)
+
+    @field_validator("record_schedule")
+    @classmethod
+    def validate_record_schedule(cls, v: list[bool]) -> list[bool]:
+        if v and len(v) != SCHEDULE_CELLS:
+            raise ValueError(f"record_schedule doit contenir {SCHEDULE_CELLS} valeurs (7 jours x 24 heures) ou etre vide")
+        return v
 
     # Caps the live/HLS leg's bitrate (kbps) and/or resolution, independent
     # of the recording leg which always stays full quality. Useful when the
@@ -164,10 +183,22 @@ class CameraUpdate(BaseModel):
     motion_enabled: Optional[bool] = None
     motion_sensitivity: Optional[int] = Field(default=None, ge=0, le=100)
     motion_mask_grid: Optional[list[bool]] = None
+    record_schedule: Optional[list[bool]] = None
 
 
 class Camera(CameraBase):
     id: str
+
+
+def schedule_allows_recording(camera: Camera, now: datetime) -> bool:
+    """Whether `camera`'s weekly timer allows recording at `now` (local
+    time). An empty record_schedule means "no restriction" - continuous
+    recording whenever camera.record is true, the behavior before this
+    field existed."""
+    if not camera.record_schedule:
+        return True
+    slot = now.weekday() * SCHEDULE_HOURS + now.hour
+    return camera.record_schedule[slot]
 
 
 class CameraStatus(BaseModel):
