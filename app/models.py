@@ -231,18 +231,20 @@ class UserRole(str, Enum):
 
 
 class Permission(str, Enum):
-    cameras_manage = "cameras_manage"        # add/edit/delete cameras, ONVIF setup
-    ptz_control = "ptz_control"              # pilot PTZ (pan/tilt/zoom, presets)
-    recordings_delete = "recordings_delete"  # delete individual recordings
-    settings_manage = "settings_manage"      # server-wide retention/HLS/thumbnail settings
+    cameras_manage = "cameras_manage"            # add/edit/delete cameras, ONVIF setup
+    ptz_control = "ptz_control"                  # pilot PTZ (pan/tilt/zoom, presets)
+    recordings_delete = "recordings_delete"      # delete individual recordings
+    recordings_download = "recordings_download"  # save a recording to the device (separate from watching it inline)
+    settings_manage = "settings_manage"          # server-wide retention/HLS/thumbnail settings
 
 
 ALL_PERMISSIONS: list[Permission] = list(Permission)
 
 # What a newly created viewer can do out of the box, matching the
 # behavior before per-user permissions existed (PTZ was unconditionally
-# available to any logged-in user, nothing else was).
-DEFAULT_VIEWER_PERMISSIONS: list[Permission] = [Permission.ptz_control]
+# available to any logged-in user, nothing else was - and so was
+# downloading a recording, there was no separate endpoint for it).
+DEFAULT_VIEWER_PERMISSIONS: list[Permission] = [Permission.ptz_control, Permission.recordings_download]
 
 
 class UserBase(BaseModel):

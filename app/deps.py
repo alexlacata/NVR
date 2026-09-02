@@ -88,4 +88,5 @@ def require_permission(permission: Permission):
 require_cameras_manage = require_permission(Permission.cameras_manage)
 require_ptz_control = require_permission(Permission.ptz_control)
 require_recordings_delete = require_permission(Permission.recordings_delete)
+require_recordings_download = require_permission(Permission.recordings_download)
 require_settings_manage = require_permission(Permission.settings_manage)

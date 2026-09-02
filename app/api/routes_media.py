@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from app.config import Settings
-from app.deps import get_settings, get_store, require_auth, require_recordings_delete
+from app.deps import get_settings, get_store, require_auth, require_recordings_delete, require_recordings_download
 from app.recordings import RECORDING_NAME_RE, list_recording_segments
 from app.store import CameraNotFound, CameraStore
 
@@ -214,6 +214,27 @@ def get_recording(
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
 ):
+    _require_camera(camera_id, store)
+    path = _resolve_recording_path(settings, camera_id, filename)
+    return FileResponse(path, media_type="video/mp4", filename=filename)
+
+
+@router.get(
+    "/{camera_id}/recordings/{filename}/download",
+    dependencies=[Depends(require_recordings_download)],
+)
+def download_recording(
+    camera_id: str,
+    filename: str,
+    store: CameraStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+):
+    """Separate from get_recording (used for inline <video> playback, which
+    stays open to any authenticated user): this is the one gated behind the
+    `recordings_download` permission, so an admin can let a viewer watch
+    recordings without letting them save a copy to their device - handy to
+    keep download off for accounts that mostly connect over a metered 4G
+    link."""
     _require_camera(camera_id, store)
     path = _resolve_recording_path(settings, camera_id, filename)
     return FileResponse(path, media_type="video/mp4", filename=filename)

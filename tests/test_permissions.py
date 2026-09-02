@@ -21,10 +21,10 @@ async def _login(client, username, password):
 
 
 @pytest.mark.asyncio
-async def test_default_viewer_has_only_ptz_control(client):
+async def test_default_viewer_has_ptz_control_and_recordings_download(client):
     await _login_admin(client)
     user = await _create_viewer(client)
-    assert user["permissions"] == ["ptz_control"]
+    assert user["permissions"] == ["ptz_control", "recordings_download"]
 
 
 @pytest.mark.asyncio
@@ -33,13 +33,15 @@ async def test_me_reports_effective_permissions(client):
     resp = await client.get("/api/auth/me")
     data = resp.json()
     assert data["role"] == "admin"
-    assert set(data["permissions"]) == {"cameras_manage", "ptz_control", "recordings_delete", "settings_manage"}
+    assert set(data["permissions"]) == {
+        "cameras_manage", "ptz_control", "recordings_delete", "recordings_download", "settings_manage",
+    }
 
     await _create_viewer(client)
     await _login(client, "bob", "viewerpass1")
     resp = await client.get("/api/auth/me")
     data = resp.json()
-    assert data["permissions"] == ["ptz_control"]
+    assert data["permissions"] == ["ptz_control", "recordings_download"]
 
 
 @pytest.mark.asyncio
@@ -84,6 +86,41 @@ async def test_viewer_without_recordings_delete_cannot_delete(client):
     await _login(client, "bob", "viewerpass1")
     resp = await client.delete("/api/cameras/whatever/recordings/2024-01-01_00-00-00.mp4")
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_viewer_without_recordings_download_cannot_download(client):
+    await _login_admin(client)
+    await _create_viewer(client, permissions=["ptz_control"])  # recordings_download withheld
+    await _login(client, "bob", "viewerpass1")
+    resp = await client.get("/api/cameras/whatever/recordings/2024-01-01_00-00-00.mp4/download")
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_viewer_without_recordings_download_can_still_watch_inline(client):
+    # The download permission only gates the dedicated /download route - the
+    # plain playback route (used by the <video> tag) stays open to any
+    # authenticated user, same as before this permission existed. A 404
+    # here (camera/file genuinely absent) rather than 403 proves the
+    # permission check never ran for this route.
+    await _login_admin(client)
+    await _create_viewer(client, permissions=["ptz_control"])
+    await _login(client, "bob", "viewerpass1")
+    resp = await client.get("/api/cameras/whatever/recordings/2024-01-01_00-00-00.mp4")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_viewer_with_recordings_download_reaches_download_route(client):
+    # Default viewer permissions include recordings_download - a 404 for a
+    # nonexistent camera (rather than 403) proves the permission check
+    # passed and the handler itself ran.
+    await _login_admin(client)
+    await _create_viewer(client)
+    await _login(client, "bob", "viewerpass1")
+    resp = await client.get("/api/cameras/whatever/recordings/2024-01-01_00-00-00.mp4/download")
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio

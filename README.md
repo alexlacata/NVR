@@ -347,6 +347,15 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
     historique) ; décochable si vous voulez un compte strictement
     visionnage.
   - `Supprimer des enregistrements`.
+  - `Télécharger des enregistrements` : coché par défaut pour un nouveau
+    lecteur. Distinct du simple visionnage : un lecteur peut toujours lire
+    un enregistrement dans le lecteur intégré même sans cette permission
+    (c'est ce que fait le bouton ▶ *Lire*), seul le bouton de téléchargement
+    ⬇ (qui enregistre une copie du fichier sur l'appareil) en dépend.
+    Pratique pour un compte utilisé surtout en 4G, afin d'éviter des
+    téléchargements de vidéos qui consomment du forfait data — le
+    visionnage en direct/à la demande reste possible, seule la copie
+    locale est bloquée.
   - `Gérer les paramètres serveur` (rétention, disque, HLS, vignettes —
     voir ci-dessous).
 

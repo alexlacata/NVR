@@ -47,9 +47,9 @@
     <div class="card" style="padding:16px 18px">
       <p class="hint" style="margin-top:0">
         Un administrateur a toujours acces a tout. Un lecteur peut se voir accorder des
-        permissions precises (gerer les cameras, piloter le PTZ, supprimer des
-        enregistrements, gerer les parametres serveur) sans devenir administrateur -
-        seul un administrateur peut gerer les comptes.
+        permissions precises (gerer les cameras, piloter le PTZ, supprimer ou
+        telecharger des enregistrements, gerer les parametres serveur) sans devenir
+        administrateur - seul un administrateur peut gerer les comptes.
       </p>
       <div id="users-list" class="rec-list"></div>
 
@@ -114,6 +114,7 @@ const PERMISSION_DEFS = [
   { value: "cameras_manage", label: "Gerer les cameras" },
   { value: "ptz_control", label: "Piloter le PTZ" },
   { value: "recordings_delete", label: "Supprimer des enregistrements" },
+  { value: "recordings_download", label: "Telecharger des enregistrements" },
   { value: "settings_manage", label: "Gerer les parametres serveur" },
 ];
 
@@ -211,7 +212,7 @@ async function loadUsers() {
   });
 }
 
-let nuPermissions = new Set(["ptz_control"]);
+let nuPermissions = new Set(["ptz_control", "recordings_download"]);
 function renderNuPermissions() {
   const wrap = document.getElementById("nu-permissions");
   wrap.innerHTML = "";
@@ -240,7 +241,7 @@ document.getElementById("add-user-form").addEventListener("submit", async (ev) =
       }),
     });
     document.getElementById("add-user-form").reset();
-    nuPermissions = new Set(["ptz_control"]);
+    nuPermissions = new Set(["ptz_control", "recordings_download"]);
     renderNuPermissions();
     toast("Utilisateur ajoute");
     await loadUsers();

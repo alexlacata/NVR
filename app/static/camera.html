@@ -498,7 +498,9 @@ async function loadRecordings(date) {
     const list = el("div", { class: "rec-list" });
     files.forEach((f) => {
       const playBtn = el("button", { class: "icon-btn", onclick: () => playRecording(f) }, "▶ Lire");
-      const dlLink = el("a", { class: "icon-btn", href: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}`, download: f.filename }, "⬇");
+      const dlLink = hasPermission("recordings_download")
+        ? el("a", { class: "icon-btn", href: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}/download`, download: f.filename }, "⬇")
+        : null;
       const delBtn = hasPermission("recordings_delete") ? el("button", { class: "icon-btn", onclick: () => deleteRecording(f) }, "🗑") : null;
       list.appendChild(el("div", { class: "rec-item" }, [
         el("span", {}, `${f.time} - ${fmtBytes(f.size_bytes)}`),
