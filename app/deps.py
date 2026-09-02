@@ -5,7 +5,8 @@ from fastapi import HTTPException, Request, status
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
 from app.ffmpeg_manager import StreamManager
-from app.models import User, UserRole
+from app.models import Permission, User, UserRole, has_permission
+from app.motion import MotionRegistry
 from app.ptz_registry import PTZRegistry
 from app.settings_store import SettingsStore
 from app.store import CameraStore
@@ -36,6 +37,10 @@ def get_ptz_registry(request: Request) -> PTZRegistry:
     return request.app.state.ptz_registry
 
 
+def get_motion_registry(request: Request) -> MotionRegistry:
+    return request.app.state.motion_registry
+
+
 def get_settings_store(request: Request) -> SettingsStore:
     return request.app.state.settings_store
 
@@ -58,3 +63,29 @@ def require_admin(request: Request) -> User:
     if user.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Reserve aux administrateurs")
     return user
+
+
+def require_permission(permission: Permission):
+    """Dependency factory for one operational permission (see Permission in
+    models.py). An admin always passes, regardless of their stored
+    permissions list. Account/user management stays exclusively behind
+    require_admin - it is intentionally not one of these permissions, so a
+    viewer granted extra permissions can never create/promote accounts."""
+
+    def _check(request: Request) -> User:
+        user = require_auth(request)
+        if not has_permission(user, permission):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission manquante")
+        return user
+
+    return _check
+
+
+# Precomputed (not called per-request) so the same callable is reused
+# everywhere a given permission is required, letting FastAPI's
+# per-request dependency cache treat repeated Depends(...) on it (e.g.
+# router-level and again as a route parameter) as a single check.
+require_cameras_manage = require_permission(Permission.cameras_manage)
+require_ptz_control = require_permission(Permission.ptz_control)
+require_recordings_delete = require_permission(Permission.recordings_delete)
+require_settings_manage = require_permission(Permission.settings_manage)

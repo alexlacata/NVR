@@ -25,6 +25,15 @@ class SourceType(str, Enum):
 
 _RESOLUTION_RE = re.compile(r"^\d{2,5}x\d{2,5}$")
 
+# Motion mask grid: a fixed-size, coarse grid of on/off cells the user
+# toggles over a camera snapshot to exclude areas (a road, a tree, a
+# neighbour's window) from motion detection. Row-major, GRID_COLS wide by
+# GRID_ROWS tall. Deliberately coarse (a handful of clicks covers a zone)
+# rather than freehand rectangles, to keep both the UI and the model simple.
+MOTION_GRID_COLS = 8
+MOTION_GRID_ROWS = 6
+MOTION_GRID_CELLS = MOTION_GRID_COLS * MOTION_GRID_ROWS
+
 
 class CameraBase(BaseModel):
     # Needed so the ptz_enabled -> onvif_url cross-field check below also
@@ -59,6 +68,23 @@ class CameraBase(BaseModel):
     # How often a thumbnail is extracted from this camera's recordings, for
     # the playback timeline. None = use the server-wide default.
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
+
+    # Motion detection: periodically diffs a small downscaled grayscale
+    # frame sampled from the camera's own live HLS segments already on
+    # disk (no extra connection to the camera). motion_sensitivity is 0
+    # (only large/close motion trips it) to 100 (trips on the slightest
+    # change). motion_mask_grid is either empty (no zone excluded) or
+    # exactly MOTION_GRID_CELLS booleans, true = excluded from detection.
+    motion_enabled: bool = False
+    motion_sensitivity: int = Field(default=50, ge=0, le=100)
+    motion_mask_grid: list[bool] = Field(default_factory=list)
+
+    @field_validator("motion_mask_grid")
+    @classmethod
+    def validate_motion_mask_grid(cls, v: list[bool]) -> list[bool]:
+        if v and len(v) != MOTION_GRID_CELLS:
+            raise ValueError(f"motion_mask_grid doit contenir {MOTION_GRID_CELLS} valeurs (ou etre vide)")
+        return v
 
     @field_validator("url")
     @classmethod
@@ -135,6 +161,9 @@ class CameraUpdate(BaseModel):
     onvif_username: Optional[str] = Field(default=None, max_length=200)
     onvif_password: Optional[str] = Field(default=None, max_length=200)
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
+    motion_enabled: Optional[bool] = None
+    motion_sensitivity: Optional[int] = Field(default=None, ge=0, le=100)
+    motion_mask_grid: Optional[list[bool]] = None
 
 
 class Camera(CameraBase):
@@ -158,13 +187,39 @@ _USERNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}$")
 
 
 class UserRole(str, Enum):
-    admin = "admin"     # manages cameras, users, server settings
-    viewer = "viewer"   # views live/recordings and operates PTZ, nothing else
+    admin = "admin"     # always has every permission below, and is the only
+                          # role that can manage accounts (create/edit/delete
+                          # users, change roles/permissions) - this stays a
+                          # hardcoded, non-delegable boundary so a viewer
+                          # granted extra permissions can never promote
+                          # themselves or anyone else to admin.
+    viewer = "viewer"   # views live/recordings by default; an admin can grant
+                          # a specific viewer additional Permission values
+                          # below (e.g. managing cameras) without making them
+                          # a full administrator.
+
+
+class Permission(str, Enum):
+    cameras_manage = "cameras_manage"        # add/edit/delete cameras, ONVIF setup
+    ptz_control = "ptz_control"              # pilot PTZ (pan/tilt/zoom, presets)
+    recordings_delete = "recordings_delete"  # delete individual recordings
+    settings_manage = "settings_manage"      # server-wide retention/HLS/thumbnail settings
+
+
+ALL_PERMISSIONS: list[Permission] = list(Permission)
+
+# What a newly created viewer can do out of the box, matching the
+# behavior before per-user permissions existed (PTZ was unconditionally
+# available to any logged-in user, nothing else was).
+DEFAULT_VIEWER_PERMISSIONS: list[Permission] = [Permission.ptz_control]
 
 
 class UserBase(BaseModel):
     username: str
     role: UserRole = UserRole.viewer
+    # Only meaningful for role=viewer - an admin always has every permission
+    # regardless of what's stored here (see effective_permissions()).
+    permissions: list[Permission] = Field(default_factory=lambda: list(DEFAULT_VIEWER_PERMISSIONS))
 
     @field_validator("username")
     @classmethod
@@ -178,12 +233,26 @@ class UserBase(BaseModel):
         return v
 
 
+def effective_permissions(user: "UserBase") -> set[Permission]:
+    """Permissions actually granted to this account: all of them for an
+    admin (hardcoded, not driven by the stored list), or the account's own
+    stored list for a viewer."""
+    if user.role == UserRole.admin:
+        return set(ALL_PERMISSIONS)
+    return set(user.permissions)
+
+
+def has_permission(user: "UserBase", permission: Permission) -> bool:
+    return permission in effective_permissions(user)
+
+
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=200)
 
 
 class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
+    permissions: Optional[list[Permission]] = None
     password: Optional[str] = Field(default=None, min_length=8, max_length=200)
 
 
@@ -210,6 +279,7 @@ class RuntimeSettingsUpdate(BaseModel):
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
     thumbnail_check_interval_seconds: Optional[int] = Field(default=None, ge=5, le=600)
     retention_check_interval_seconds: Optional[int] = Field(default=None, ge=10, le=3600)
+    motion_check_interval_seconds: Optional[int] = Field(default=None, ge=2, le=300)
 
 
 class RuntimeSettingsOut(BaseModel):
@@ -221,3 +291,4 @@ class RuntimeSettingsOut(BaseModel):
     thumbnail_interval_seconds: int
     thumbnail_check_interval_seconds: int
     retention_check_interval_seconds: int
+    motion_check_interval_seconds: int

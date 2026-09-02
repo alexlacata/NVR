@@ -23,6 +23,7 @@ OVERRIDABLE_FIELDS = (
     "thumbnail_interval_seconds",
     "thumbnail_check_interval_seconds",
     "retention_check_interval_seconds",
+    "motion_check_interval_seconds",
 )
 
 

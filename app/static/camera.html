@@ -18,6 +18,7 @@
 <div class="topbar">
   <h1><a href="/index.html" style="color:inherit">←</a> <span id="cam-title">Camera</span></h1>
   <div class="actions">
+    <span id="motion-badge" class="badge error" hidden><span class="dot"></span>Mouvement</span>
     <span id="cam-badge"></span>
     <a class="btn secondary" href="/settings.html">Parametres</a>
   </div>
@@ -77,7 +78,16 @@
       <div class="section-title" style="margin-top:10px">Bande passante du direct (4G / liaison limitee)</div>
       <div class="row">
         <div><label>Bitrate maximum du direct (kbps)</label><input type="text" inputmode="numeric" id="f-bitrate" placeholder="ex. 800 (vide = illimite)"></div>
-        <div><label>Resolution du direct</label><input type="text" id="f-scale" placeholder="ex. 854x480 (vide = originale)"></div>
+        <div><label>Resolution du direct</label>
+          <select id="f-scale">
+            <option value="">Originale (pas de limite)</option>
+            <option value="1920x1080">1920x1080 (Full HD)</option>
+            <option value="1280x720">1280x720 (HD)</option>
+            <option value="854x480">854x480 (SD)</option>
+            <option value="640x360">640x360</option>
+            <option value="426x240">426x240 (tres faible debit)</option>
+          </select>
+        </div>
       </div>
       <div class="hint">Force un reencodage du direct pour tenir dans une liaison 4G/Peplink limitee ; l'enregistrement reste toujours en pleine qualite.</div>
 
@@ -93,6 +103,20 @@
           <div><label>Utilisateur ONVIF</label><input type="text" id="f-onvif-user"></div>
           <div><label>Mot de passe ONVIF</label><input type="password" id="f-onvif-pass" autocomplete="new-password"></div>
         </div>
+      </div>
+
+      <div class="section-title" style="margin-top:10px">Detection de mouvement</div>
+      <div class="checkbox-row"><input type="checkbox" id="f-motion-enabled"><label>Activer la detection de mouvement</label></div>
+      <div id="motion-fields">
+        <div>
+          <label>Sensibilite (<span id="motion-sensitivity-val">50</span>)</label>
+          <input type="range" id="f-motion-sensitivity" min="0" max="100" value="50" style="width:100%">
+        </div>
+        <div class="hint">Plus la sensibilite est elevee, plus un petit changement suffit a declencher une detection.</div>
+        <div class="hint" id="motion-status-hint"></div>
+        <label>Zones de masquage (exclues de la detection)</label>
+        <div class="hint">Cliquez sur les cases a exclure (ex. une route, des arbres) pour eviter les fausses detections a cet endroit.</div>
+        <div id="motion-mask-editor" class="motion-mask-editor"></div>
       </div>
 
       <div class="error-msg" id="edit-error"></div>
@@ -113,6 +137,8 @@ const camId = params.get("id");
 if (!camId) location.href = "/index.html";
 
 let currentHls = null;
+let timelinePlayheadDate = null;
+let timelinePlayheadSeconds = null;
 
 function setBadge(state) {
   const badge = document.getElementById("cam-badge");
@@ -153,13 +179,28 @@ async function loadCamera() {
   document.getElementById("f-enabled").checked = cam.enabled;
   document.getElementById("f-record").checked = cam.record;
   document.getElementById("f-bitrate").value = cam.live_max_bitrate_kbps || "";
-  document.getElementById("f-scale").value = cam.live_scale || "";
+  const scaleSelect = document.getElementById("f-scale");
+  const scaleValue = cam.live_scale || "";
+  scaleSelect.value = scaleValue;
+  if (scaleSelect.value !== scaleValue) {
+    // a custom resolution set some other way (API, older free-text value)
+    // that isn't one of the presets - keep it selectable instead of
+    // silently resetting it to "Originale" on save.
+    scaleSelect.appendChild(el("option", { value: scaleValue }, `${scaleValue} (personnalisee)`));
+    scaleSelect.value = scaleValue;
+  }
   document.getElementById("f-thumb-interval").value = cam.thumbnail_interval_seconds || "";
   document.getElementById("f-ptz-enabled").checked = cam.ptz_enabled;
   document.getElementById("f-onvif-url").value = cam.onvif_url || "";
   document.getElementById("f-onvif-user").value = cam.onvif_username || "";
   document.getElementById("f-onvif-pass").value = cam.onvif_password || "";
   updatePtzFieldsVisibility();
+
+  document.getElementById("f-motion-enabled").checked = cam.motion_enabled;
+  document.getElementById("f-motion-sensitivity").value = cam.motion_sensitivity;
+  document.getElementById("motion-sensitivity-val").textContent = cam.motion_sensitivity;
+  updateMotionFieldsVisibility();
+  if (hasPermission("cameras_manage")) buildMotionMaskEditor(cam);
 
   renderPtzPanel(cam);
 
@@ -170,6 +211,66 @@ function updatePtzFieldsVisibility() {
   document.getElementById("ptz-fields").hidden = !document.getElementById("f-ptz-enabled").checked;
 }
 document.getElementById("f-ptz-enabled").addEventListener("change", updatePtzFieldsVisibility);
+
+function updateMotionFieldsVisibility() {
+  document.getElementById("motion-fields").hidden = !document.getElementById("f-motion-enabled").checked;
+}
+document.getElementById("f-motion-enabled").addEventListener("change", updateMotionFieldsVisibility);
+document.getElementById("f-motion-sensitivity").addEventListener("input", (ev) => {
+  document.getElementById("motion-sensitivity-val").textContent = ev.target.value;
+});
+
+// --- Motion mask zone editor: an 8x6 grid of toggle cells over a live
+// snapshot, matching MOTION_GRID_COLS x MOTION_GRID_ROWS server-side
+// (app/models.py). Cells stay in-memory in motionMaskGrid and are only
+// sent to the server when the whole form is saved, like every other field.
+const MOTION_GRID_COLS = 8, MOTION_GRID_ROWS = 6;
+let motionMaskGrid = new Array(MOTION_GRID_COLS * MOTION_GRID_ROWS).fill(false);
+let motionMaskEditorBuilt = false;
+
+function buildMotionMaskEditor(cam) {
+  if (motionMaskEditorBuilt) return; // avoid rebuilding (and losing unsaved edits) on every poll
+  motionMaskEditorBuilt = true;
+  const editor = document.getElementById("motion-mask-editor");
+  editor.innerHTML = "";
+  const cellCount = MOTION_GRID_COLS * MOTION_GRID_ROWS;
+  motionMaskGrid = (Array.isArray(cam.motion_mask_grid) && cam.motion_mask_grid.length === cellCount)
+    ? cam.motion_mask_grid.slice()
+    : new Array(cellCount).fill(false);
+  editor.appendChild(el("img", {
+    src: `/api/cameras/${encodeURIComponent(camId)}/snapshot.jpg?t=${Date.now()}`,
+    alt: "Apercu camera",
+    onerror: (ev) => { ev.target.style.display = "none"; },
+  }));
+  for (let i = 0; i < cellCount; i++) {
+    const cell = el("button", {
+      type: "button",
+      class: "motion-mask-cell" + (motionMaskGrid[i] ? " masked" : ""),
+      title: "Cliquer pour exclure/inclure cette zone",
+      onclick: () => {
+        motionMaskGrid[i] = !motionMaskGrid[i];
+        cell.classList.toggle("masked", motionMaskGrid[i]);
+      },
+    });
+    editor.appendChild(cell);
+  }
+}
+
+async function refreshMotionBadge() {
+  const badge = document.getElementById("motion-badge");
+  try {
+    const status = await apiJson(`/api/cameras/${encodeURIComponent(camId)}/motion`);
+    badge.hidden = !status.active;
+    const hint = document.getElementById("motion-status-hint");
+    if (hint) {
+      hint.textContent = status.last_motion_at
+        ? `Dernier mouvement detecte : ${new Date(status.last_motion_at).toLocaleString()}`
+        : "Aucun mouvement detecte pour l'instant.";
+    }
+  } catch (e) {
+    badge.hidden = true;
+  }
+}
 
 // --- PTZ ---
 let ptzMoving = false;
@@ -238,7 +339,7 @@ async function loadPtzPresets(container) {
 
 function renderPtzPanel(cam) {
   const panel = document.getElementById("ptz-panel");
-  if (!cam.ptz_enabled) {
+  if (!cam.ptz_enabled || !hasPermission("ptz_control")) {
     panel.hidden = true;
     panel.innerHTML = "";
     return;
@@ -294,7 +395,7 @@ async function loadRecordings(date) {
     files.forEach((f) => {
       const playBtn = el("button", { class: "icon-btn", onclick: () => playRecording(f) }, "▶ Lire");
       const dlLink = el("a", { class: "icon-btn", href: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}`, download: f.filename }, "⬇");
-      const delBtn = isAdmin() ? el("button", { class: "icon-btn", onclick: () => deleteRecording(f) }, "🗑") : null;
+      const delBtn = hasPermission("recordings_delete") ? el("button", { class: "icon-btn", onclick: () => deleteRecording(f) }, "🗑") : null;
       list.appendChild(el("div", { class: "rec-item" }, [
         el("span", {}, `${f.time} - ${fmtBytes(f.size_bytes)}`),
         el("div", { class: "rec-actions" }, [playBtn, dlLink, delBtn]),
@@ -327,6 +428,9 @@ function playAt(filename, offsetSeconds) {
 }
 
 async function seekToTime(date, time) {
+  timelinePlayheadDate = date;
+  timelinePlayheadSeconds = timeStrToSeconds(time);
+  updatePlayheadVisual();
   try {
     const result = await apiJson(`/api/cameras/${encodeURIComponent(camId)}/recordings/at?ts=${encodeURIComponent(`${date}T${time}`)}`);
     playAt(result.filename, result.offset_seconds);
@@ -340,12 +444,86 @@ function timeStrToSeconds(t) {
   return h * 3600 + m * 60 + s;
 }
 
+function secondsToTimeStr(totalSeconds) {
+  totalSeconds = Math.max(0, Math.min(86399, Math.round(totalSeconds)));
+  return `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
+}
+
+// Keeps the white playhead marker in sync with timelinePlayheadDate/Seconds -
+// called after any seek (bar drag, segment click, thumbnail click) and after
+// rebuilding the bar, so "where am I" stays visible however you navigated.
+function updatePlayheadVisual() {
+  const playhead = document.getElementById("timeline-playhead");
+  if (!playhead) return;
+  const dateFilter = document.getElementById("date-filter").value || null;
+  if (timelinePlayheadSeconds == null || timelinePlayheadDate !== dateFilter) {
+    playhead.hidden = true;
+    return;
+  }
+  playhead.hidden = false;
+  playhead.style.left = `${timelinePlayheadSeconds / 864}%`;
+}
+
+function xToDaySeconds(bar, clientX) {
+  const rect = bar.getBoundingClientRect();
+  const frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  return Math.round(frac * 86400);
+}
+
+// Click-to-jump AND press-and-drag-to-scrub on the same bar: pointerdown
+// previews a position immediately (so a simple tap behaves like the old
+// click-to-seek), pointermove while held drags the preview live with a
+// floating time tooltip, and only pointerup commits the actual seek - so
+// you can drag around to find the right moment before "letting go" of it.
+// Also previews the time under the pointer on hover (desktop) so you know
+// where you'll land before clicking at all.
+function wireTimelineInteraction(bar, date) {
+  const tooltip = document.getElementById("timeline-tooltip");
+  const playhead = document.getElementById("timeline-playhead");
+  let dragging = false;
+
+  function preview(clientX) {
+    const seconds = xToDaySeconds(bar, clientX);
+    const rect = bar.getBoundingClientRect();
+    const leftPx = Math.min(rect.width, Math.max(0, clientX - rect.left));
+    tooltip.textContent = secondsToTimeStr(seconds);
+    tooltip.style.left = `${leftPx}px`;
+    tooltip.classList.add("show");
+    playhead.hidden = false;
+    playhead.style.left = `${seconds / 864}%`;
+    return seconds;
+  }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+
+  bar.onpointerdown = (ev) => {
+    dragging = true;
+    bar.setPointerCapture(ev.pointerId);
+    preview(ev.clientX);
+  };
+  bar.onpointermove = (ev) => { preview(ev.clientX); };
+  bar.onpointerup = (ev) => {
+    if (!dragging) return;
+    dragging = false;
+    try { bar.releasePointerCapture(ev.pointerId); } catch (e) {}
+    hideTooltip();
+    const seconds = xToDaySeconds(bar, ev.clientX);
+    seekToTime(date, secondsToTimeStr(seconds));
+  };
+  bar.onpointercancel = () => { dragging = false; hideTooltip(); updatePlayheadVisual(); };
+  bar.onpointerleave = () => { if (!dragging) { hideTooltip(); updatePlayheadVisual(); } };
+}
+
 async function loadTimeline(date) {
   const bar = document.getElementById("timeline-bar");
   const emptyMsg = document.getElementById("timeline-empty");
   const strip = document.getElementById("thumb-strip");
   bar.innerHTML = "";
   bar.onclick = null;
+  bar.onpointerdown = null;
+  bar.onpointermove = null;
+  bar.onpointerup = null;
+  bar.onpointercancel = null;
+  bar.onpointerleave = null;
   strip.innerHTML = "";
 
   if (!date) {
@@ -374,16 +552,17 @@ async function loadTimeline(date) {
         class: "timeline-seg",
         style: `left:${leftPct}%;width:${widthPct}%`,
         title: `${r.time}`,
-        onclick: (ev) => { ev.stopPropagation(); seekToTime(date, r.time); },
       }));
     });
-    bar.onclick = (ev) => {
-      const rect = bar.getBoundingClientRect();
-      const frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
-      const totalSeconds = Math.round(frac * 86400);
-      const time = `${pad2(Math.floor(totalSeconds / 3600))}:${pad2(Math.floor((totalSeconds % 3600) / 60))}:${pad2(totalSeconds % 60)}`;
-      seekToTime(date, time);
-    };
+    if (date === localDateStr(new Date())) {
+      const now = new Date();
+      const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      bar.appendChild(el("div", { class: "timeline-now", style: `left:${nowSec / 864}%`, title: "Maintenant" }));
+    }
+    bar.appendChild(el("div", { class: "timeline-playhead", id: "timeline-playhead", hidden: "" }));
+    bar.appendChild(el("div", { class: "timeline-tooltip", id: "timeline-tooltip" }));
+    wireTimelineInteraction(bar, date);
+    updatePlayheadVisual();
   }
 
   if (thumbnails.length === 0) {
@@ -441,6 +620,9 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         onvif_url: document.getElementById("f-onvif-url").value || null,
         onvif_username: document.getElementById("f-onvif-user").value || null,
         onvif_password: document.getElementById("f-onvif-pass").value || null,
+        motion_enabled: document.getElementById("f-motion-enabled").checked,
+        motion_sensitivity: parseInt(document.getElementById("f-motion-sensitivity").value, 10),
+        motion_mask_grid: motionMaskGrid,
       }),
     });
     await loadCamera();
@@ -476,17 +658,19 @@ function mountStreamHelpers() {
 
 (async () => {
   await requireAuth();
-  if (!isAdmin()) {
+  if (!hasPermission("cameras_manage")) {
     document.getElementById("admin-settings-section").hidden = true;
   }
   systemInfo = await apiJson("/api/system").catch(() => null);
   await loadCamera();
-  if (isAdmin()) mountStreamHelpers();
+  if (hasPermission("cameras_manage")) mountStreamHelpers();
   const today = localDateStr(new Date());
   document.getElementById("date-filter").value = today;
   await loadRecordings(today);
   await loadTimeline(today);
+  await refreshMotionBadge();
   setInterval(loadCamera, 15000);
+  setInterval(refreshMotionBadge, 8000);
 })();
 </script>
 </body>

@@ -3,13 +3,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.deps import get_ptz_registry, get_store, require_auth
+from app.deps import get_ptz_registry, get_store, require_ptz_control
 from app.models import Camera
 from app.onvif_client import OnvifError
 from app.ptz_registry import PTZRegistry
 from app.store import CameraNotFound, CameraStore
 
-router = APIRouter(prefix="/api/cameras/{camera_id}/ptz", tags=["ptz"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/api/cameras/{camera_id}/ptz", tags=["ptz"], dependencies=[Depends(require_ptz_control)])
 
 
 class MoveRequest(BaseModel):

@@ -6,13 +6,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.config import Settings
-from app.deps import get_settings, get_settings_store, get_store, get_stream_manager, require_admin
+from app.deps import get_settings, get_settings_store, get_store, get_stream_manager, require_settings_manage
 from app.ffmpeg_manager import StreamManager
 from app.models import RuntimeSettingsOut, RuntimeSettingsUpdate
 from app.settings_store import SettingsStore
 from app.store import CameraStore
 
-router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_settings_manage)])
 
 
 def _out(settings: Settings) -> RuntimeSettingsOut:
@@ -25,6 +25,7 @@ def _out(settings: Settings) -> RuntimeSettingsOut:
         thumbnail_interval_seconds=settings.thumbnail_interval_seconds,
         thumbnail_check_interval_seconds=settings.thumbnail_check_interval_seconds,
         retention_check_interval_seconds=settings.retention_check_interval_seconds,
+        motion_check_interval_seconds=settings.motion_check_interval_seconds,
     )
 
 

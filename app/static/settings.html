@@ -41,10 +41,16 @@
     </form>
   </div>
 
-  <div id="admin-sections" hidden>
+  <div id="admin-only-section" hidden>
 
     <div class="section-title">Utilisateurs</div>
     <div class="card" style="padding:16px 18px">
+      <p class="hint" style="margin-top:0">
+        Un administrateur a toujours acces a tout. Un lecteur peut se voir accorder des
+        permissions precises (gerer les cameras, piloter le PTZ, supprimer des
+        enregistrements, gerer les parametres serveur) sans devenir administrateur -
+        seul un administrateur peut gerer les comptes.
+      </p>
       <div id="users-list" class="rec-list"></div>
 
       <div class="hint" style="margin-top:14px">Ajouter un compte</div>
@@ -55,14 +61,19 @@
         </div>
         <div><label>Role</label>
           <select id="nu-role">
-            <option value="viewer">Lecteur (voir les cameras, piloter le PTZ)</option>
-            <option value="admin">Administrateur (configuration complete)</option>
+            <option value="viewer">Lecteur (permissions configurables ci-dessous)</option>
+            <option value="admin">Administrateur (acces complet)</option>
           </select>
         </div>
+        <div id="nu-permissions" style="display:flex;flex-wrap:wrap;gap:14px"></div>
         <div class="error-msg" id="add-user-error"></div>
         <div><button type="submit" class="btn secondary">Ajouter l'utilisateur</button></div>
       </form>
     </div>
+
+  </div>
+
+  <div id="settings-section" hidden>
 
     <div class="section-title">Parametres serveur</div>
     <div class="card" style="padding:16px 18px">
@@ -99,6 +110,23 @@
 <script>
 document.getElementById("btn-logout").addEventListener("click", logout);
 
+const PERMISSION_DEFS = [
+  { value: "cameras_manage", label: "Gerer les cameras" },
+  { value: "ptz_control", label: "Piloter le PTZ" },
+  { value: "recordings_delete", label: "Supprimer des enregistrements" },
+  { value: "settings_manage", label: "Gerer les parametres serveur" },
+];
+
+function permissionCheckboxes(selected, onChange) {
+  const selectedSet = new Set(selected || []);
+  return PERMISSION_DEFS.map((p) => {
+    const ck = el("input", { type: "checkbox" });
+    ck.checked = selectedSet.has(p.value);
+    ck.addEventListener("change", () => onChange(p.value, ck.checked));
+    return el("label", { class: "checkbox-row", style: "font-size:13px" }, [ck, p.label]);
+  });
+}
+
 function renderAccessQrCode() {
   document.getElementById("qr-url").textContent = location.origin;
   new QRCode(document.getElementById("qr-code"), {
@@ -124,6 +152,7 @@ async function loadUsers() {
           body: JSON.stringify({ role: roleSelect.value }),
         });
         toast(`Role de ${u.username} mis a jour`);
+        await loadUsers(); // role change flips whether permission checkboxes apply - refresh the row
       } catch (e) {
         toast(e.message);
         await loadUsers();
@@ -149,12 +178,52 @@ async function loadUsers() {
         }
       },
     }, "🗑");
-    listEl.appendChild(el("div", { class: "rec-item" }, [
-      el("span", {}, u.username + (isSelf ? " (vous)" : "")),
-      el("div", { class: "rec-actions", style: "align-items:center" }, [roleSelect, delBtn]),
-    ]));
+
+    const rowChildren = [
+      el("div", { class: "rec-item" }, [
+        el("span", {}, u.username + (isSelf ? " (vous)" : "")),
+        el("div", { class: "rec-actions", style: "align-items:center" }, [roleSelect, delBtn]),
+      ]),
+    ];
+
+    if (u.role === "viewer") {
+      const permsWrap = el("div", {
+        style: "display:flex;flex-wrap:wrap;gap:12px;padding:2px 13px 12px",
+      }, permissionCheckboxes(u.permissions, async (perm, checked) => {
+        const next = new Set(u.permissions || []);
+        if (checked) next.add(perm); else next.delete(perm);
+        u.permissions = Array.from(next);
+        try {
+          await apiJson(`/api/users/${encodeURIComponent(u.username)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ permissions: u.permissions }),
+          });
+          toast(`Permissions de ${u.username} mises a jour`);
+        } catch (e) {
+          toast(e.message);
+          await loadUsers();
+        }
+      }));
+      rowChildren.push(permsWrap);
+    }
+
+    listEl.appendChild(el("div", {}, rowChildren));
   });
 }
+
+let nuPermissions = new Set(["ptz_control"]);
+function renderNuPermissions() {
+  const wrap = document.getElementById("nu-permissions");
+  wrap.innerHTML = "";
+  const isViewer = document.getElementById("nu-role").value === "viewer";
+  wrap.hidden = !isViewer;
+  if (!isViewer) return;
+  permissionCheckboxes(Array.from(nuPermissions), (perm, checked) => {
+    if (checked) nuPermissions.add(perm); else nuPermissions.delete(perm);
+  }).forEach((row) => wrap.appendChild(row));
+}
+document.getElementById("nu-role").addEventListener("change", renderNuPermissions);
+renderNuPermissions();
 
 document.getElementById("add-user-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -167,9 +236,12 @@ document.getElementById("add-user-form").addEventListener("submit", async (ev) =
         username: document.getElementById("nu-username").value,
         password: document.getElementById("nu-password").value,
         role: document.getElementById("nu-role").value,
+        permissions: Array.from(nuPermissions),
       }),
     });
     document.getElementById("add-user-form").reset();
+    nuPermissions = new Set(["ptz_control"]);
+    renderNuPermissions();
     toast("Utilisateur ajoute");
     await loadUsers();
   } catch (e) {
@@ -242,8 +314,11 @@ document.getElementById("server-form").addEventListener("submit", async (ev) => 
   document.getElementById("whoami").textContent =
     `Connecte en tant que ${currentUser.username} (${currentUser.role === "admin" ? "administrateur" : "lecteur"}).`;
   if (isAdmin()) {
-    document.getElementById("admin-sections").hidden = false;
+    document.getElementById("admin-only-section").hidden = false;
     await loadUsers();
+  }
+  if (hasPermission("settings_manage")) {
+    document.getElementById("settings-section").hidden = false;
     await loadServerSettings();
   }
 })();

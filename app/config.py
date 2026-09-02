@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     hls_segment_seconds: int = 2
     hls_list_size: int = 6
 
+    # Motion detection sampling cadence (seconds between frame grabs per
+    # camera, for cameras with motion_enabled). Independent of retention/
+    # thumbnail cadence since it needs to be more frequent to feel responsive.
+    motion_check_interval_seconds: int = 5
+    # Minimum gap between two recorded motion *events* for the same camera,
+    # so continuous motion doesn't spam an event every single check.
+    motion_event_cooldown_seconds: int = 30
+
     # Networking
     host: str = "0.0.0.0"
     port: int = 8000
@@ -90,6 +98,10 @@ class Settings(BaseSettings):
         return self.data_dir / "thumbnails"
 
     @property
+    def motion_dir(self) -> Path:
+        return self.data_dir / "motion"
+
+    @property
     def secret_key_file(self) -> Path:
         return self.config_dir / "secret_key"
 
@@ -101,7 +113,7 @@ class Settings(BaseSettings):
                 "Peplink), c'est probablement qu'il n'est pas encore monte - verifiez le montage "
                 "(systemd .mount/automount ou /etc/fstab) avant de relancer le service."
             )
-        for d in (self.data_dir, self.config_dir, self.recordings_dir, self.hls_dir, self.thumbnails_dir):
+        for d in (self.data_dir, self.config_dir, self.recordings_dir, self.hls_dir, self.thumbnails_dir, self.motion_dir):
             d.mkdir(parents=True, exist_ok=True)
 
     def resolve_secret_key(self) -> str:

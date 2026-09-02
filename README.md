@@ -179,10 +179,15 @@ d'un tap.
 
 Sur la page de la caméra, sous la vidéo, une ligne du temps représente les
 24 heures de la date sélectionnée : les portions enregistrées apparaissent
-en surbrillance. Cliquez n'importe où sur la ligne pour lancer la lecture à
-cet instant précis — le serveur retrouve automatiquement le bon fichier et
-se positionne au bon endroit dedans, vous n'avez pas besoin de chercher le
-fichier vous-même.
+en surbrillance. Un simple tap lance la lecture à cet instant précis — le
+serveur retrouve automatiquement le bon fichier et se positionne au bon
+endroit dedans, vous n'avez pas besoin de chercher le fichier vous-même.
+Vous pouvez aussi **glisser le doigt (ou la souris) le long de la ligne**
+pour la parcourir : une bulle affiche l'heure exacte en continu pendant que
+vous faites glisser, et la lecture ne saute qu'au relâchement — pratique
+pour viser précisément un moment sans multiplier les taps. Un repère blanc
+marque l'instant actuellement affiché, et un repère orange indique l'heure
+actuelle sur la ligne du temps du jour même.
 
 En dessous, une bande de vignettes (miniatures) défile horizontalement ;
 chacune est extraite des enregistrements déjà sur le disque, à intervalle
@@ -194,6 +199,32 @@ vignettes ne coûtent aucune bande passante caméra supplémentaire : elles
 sont extraites localement des fichiers déjà enregistrés, jamais d'une
 connexion en direct.
 
+## Détection de mouvement, sensibilité et zones de masquage
+
+Sur la page de la caméra (section *Paramètres de la caméra*, réservée aux
+comptes avec la permission *Gérer les caméras*) :
+
+- **Activer la détection de mouvement** : le serveur compare périodiquement
+  une image basse résolution extraite du flux en direct déjà enregistré sur
+  disque (aucune connexion supplémentaire à la caméra, aucun logiciel de
+  vision par ordinateur lourd) à la précédente, et considère qu'il y a
+  mouvement si une part suffisante de l'image a changé.
+- **Sensibilité** (curseur 0-100) : plus elle est élevée, plus une petite
+  variation suffit à déclencher une détection. Baissez-la si la caméra
+  déclenche trop souvent (vent dans les feuillages, variations de
+  luminosité) ; montez-la pour détecter des mouvements plus discrets ou
+  plus lointains.
+- **Zones de masquage** : cliquez sur les cases de la grille superposée à
+  l'aperçu de la caméra pour exclure une zone de la détection (une route
+  passante, un arbre, une fenêtre de voisinage...) sans désactiver la
+  détection pour le reste du champ de vision.
+
+Un badge **Mouvement** apparaît en haut de la page de la caméra dès qu'un
+mouvement est en cours de détection, et l'heure du dernier mouvement détecté
+s'affiche sous le réglage de sensibilité. La fréquence de vérification
+(`NVR_MOTION_CHECK_INTERVAL_SECONDS`, 5 secondes par défaut) est un réglage
+serveur global.
+
 ## Comptes utilisateurs et paramètres serveur
 
 Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
@@ -201,16 +232,30 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
 - **Mon compte** : changer son propre mot de passe (tous les comptes).
 - **Utilisateurs** *(administrateurs uniquement)* : créer des comptes,
   changer le rôle d'un compte (**Administrateur** ou **Lecteur**), supprimer
-  un compte. Un compte **Lecteur** peut regarder les caméras en direct et en
-  différé et piloter le PTZ, mais ne voit ni les boutons d'ajout/suppression
-  de caméra, ni les réglages serveur, ni la gestion des utilisateurs — et
-  l'API refuse ces actions même en cas d'appel direct (403), la restriction
-  n'est pas qu'une question d'affichage. Il est impossible de supprimer ou de
-  rétrograder le dernier compte administrateur restant, pour ne jamais se
-  retrouver sans accès admin.
-- **Paramètres serveur** *(administrateurs uniquement)* : rétention,
-  seuil d'espace disque libre, durée des fichiers d'enregistrement, réglages
-  HLS et vignettes — les mêmes réglages que les variables d'environnement
+  un compte, et — pour un compte **Lecteur** — cocher précisément ce qu'il a
+  le droit de faire :
+  - `Gérer les caméras` : ajouter/modifier/supprimer une caméra, assistant
+    ONVIF/marque, réglages de détection de mouvement.
+  - `Piloter le PTZ` : coché par défaut pour un nouveau lecteur (comportement
+    historique) ; décochable si vous voulez un compte strictement
+    visionnage.
+  - `Supprimer des enregistrements`.
+  - `Gérer les paramètres serveur` (rétention, disque, HLS, vignettes —
+    voir ci-dessous).
+
+  Un administrateur a toujours accès à tout, quoi que ces cases indiquent.
+  La gestion des comptes elle-même (créer/supprimer un utilisateur, changer
+  un rôle ou des permissions) reste réservée aux administrateurs — un
+  lecteur ne peut jamais s'accorder plus de droits, même avec toutes les
+  permissions ci-dessus cochées. L'API refuse toute action non autorisée
+  même en appel direct (403), la restriction n'est pas qu'une question
+  d'affichage. Il est impossible de supprimer ou de rétrograder le dernier
+  compte administrateur restant, pour ne jamais se retrouver sans accès
+  admin.
+- **Paramètres serveur** *(administrateurs, ou un lecteur avec la
+  permission `Gérer les paramètres serveur`)* : rétention, seuil d'espace
+  disque libre, durée des fichiers d'enregistrement, réglages HLS et
+  vignettes — les mêmes réglages que les variables d'environnement
   `NVR_*` ci-dessous, mais modifiables sans redémarrer le conteneur.
   L'enregistrement est appliqué immédiatement et les flux caméra en cours
   redémarrent brièvement pour prendre en compte les nouveaux réglages
@@ -351,6 +396,7 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_HLS_LIST_SIZE` | `6` | Nombre de segments HLS conservés dans la playlist (marge sur liaison instable) — idem |
 | `NVR_THUMBNAIL_INTERVAL_SECONDS` | `60` | Intervalle par défaut entre deux vignettes (secondes), surchargeable par caméra — idem |
 | `NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS` | `30` | Fréquence de vérification des nouveaux enregistrements à traiter — idem |
+| `NVR_MOTION_CHECK_INTERVAL_SECONDS` | `5` | Fréquence d'échantillonnage pour la détection de mouvement (caméras avec `motion_enabled`) — idem |
 | `NVR_PORT` | `8000` | Port d'écoute |
 
 Les lignes marquées « idem » ci-dessus ne fixent qu'une valeur de démarrage :
@@ -371,6 +417,7 @@ app/
   retention.py         purge automatique des enregistrements et vignettes
   recordings.py         nommage/parcours des segments enregistrés (partagé)
   thumbnails.py          extraction des vignettes depuis les segments termines
+  motion.py               detection de mouvement (diff d'image bas niveau, sans dependance lourde)
   auth.py              authentification par session + comptes (bootstrap, vérification)
   deps.py                dépendances FastAPI (require_auth, require_admin)
   onvif_client.py        client ONVIF (PTZ + decouverte des flux media)

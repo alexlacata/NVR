@@ -88,6 +88,7 @@ class UserStore:
             user = User(
                 username=payload.username,
                 role=payload.role,
+                permissions=payload.permissions,
                 password_hash=pwd_context.hash(payload.password),
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
@@ -111,6 +112,8 @@ class UserStore:
             updates: dict = {}
             if payload.role is not None:
                 updates["role"] = payload.role
+            if payload.permissions is not None:
+                updates["permissions"] = payload.permissions
             if payload.password is not None:
                 updates["password_hash"] = pwd_context.hash(payload.password)
             merged = existing.model_copy(update=updates)

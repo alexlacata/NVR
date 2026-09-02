@@ -12,6 +12,7 @@ from app.api import (
     routes_auth,
     routes_cameras,
     routes_media,
+    routes_motion,
     routes_onvif,
     routes_ptz,
     routes_settings,
@@ -21,6 +22,7 @@ from app.api import (
 from app.auth import AuthService, bootstrap_admin
 from app.config import get_settings
 from app.ffmpeg_manager import StreamManager
+from app.motion import MotionRegistry, motion_loop
 from app.ptz_registry import PTZRegistry
 from app.retention import retention_loop
 from app.settings_store import SettingsStore
@@ -48,6 +50,7 @@ async def lifespan(app: FastAPI):
     app.state.auth_service = AuthService(settings, app.state.user_store)
     app.state.stream_manager = StreamManager(settings)
     app.state.ptz_registry = PTZRegistry()
+    app.state.motion_registry = MotionRegistry(settings.motion_dir)
 
     await app.state.stream_manager.reconcile(app.state.store.list())
 
@@ -55,6 +58,7 @@ async def lifespan(app: FastAPI):
     app.state.retention_stop_event = stop_event
     retention_task = asyncio.create_task(retention_loop(settings, stop_event))
     thumbnail_task = asyncio.create_task(thumbnail_loop(settings, app.state.store, stop_event))
+    motion_task = asyncio.create_task(motion_loop(settings, app.state.store, app.state.motion_registry, stop_event))
 
     try:
         yield
@@ -62,6 +66,7 @@ async def lifespan(app: FastAPI):
         stop_event.set()
         await retention_task
         await thumbnail_task
+        await motion_task
         await app.state.stream_manager.stop_all()
 
 
@@ -72,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_cameras.router)
     app.include_router(routes_media.router)
     app.include_router(routes_ptz.router)
+    app.include_router(routes_motion.router)
     app.include_router(routes_onvif.router)
     app.include_router(routes_system.router)
     app.include_router(routes_users.router)

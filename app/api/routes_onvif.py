@@ -6,13 +6,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.deps import require_admin
+from app.deps import require_cameras_manage
 from app.onvif_client import OnvifError, probe_media
 from app.onvif_discovery import discover_onvif_devices
 
 # Camera setup actions - not needed to just watch/operate a camera, so
-# reserved for admins like the rest of camera configuration.
-router = APIRouter(prefix="/api/onvif", tags=["onvif"], dependencies=[Depends(require_admin)])
+# gated behind the same permission as the rest of camera configuration.
+router = APIRouter(prefix="/api/onvif", tags=["onvif"], dependencies=[Depends(require_cameras_manage)])
 
 
 class ProbeRequest(BaseModel):

@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/users", tags=["users"], dependencies=[Depends(re
 
 
 def _public(u: User) -> UserPublic:
-    return UserPublic(username=u.username, role=u.role, created_at=u.created_at)
+    return UserPublic(username=u.username, role=u.role, permissions=u.permissions, created_at=u.created_at)
 
 
 @router.get("", response_model=list[UserPublic])

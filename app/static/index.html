@@ -90,7 +90,7 @@ async function loadCameras() {
     grid.innerHTML = "";
     grid.appendChild(el("div", { class: "empty-state" }, [
       el("p", {}, "Aucune camera configuree."),
-      isAdmin() ? el("button", { class: "btn", onclick: () => openAddModal() }, "Ajouter une camera") : null,
+      hasPermission("cameras_manage") ? el("button", { class: "btn", onclick: () => openAddModal() }, "Ajouter une camera") : null,
     ]));
     grid.dataset.emptyShown = "1";
     return;
@@ -221,7 +221,7 @@ document.getElementById("btn-logout").addEventListener("click", logout);
 
 (async () => {
   await requireAuth();
-  document.getElementById("btn-add").hidden = !isAdmin();
+  document.getElementById("btn-add").hidden = !hasPermission("cameras_manage");
   await loadDisk();
   await loadCameras();
   setInterval(loadCameras, 15000);

@@ -43,6 +43,14 @@ function isAdmin() {
   return !!currentUser && currentUser.role === "admin";
 }
 
+// Permission-based UI gating (cameras_manage, ptz_control,
+// recordings_delete, settings_manage) - independent of role, so a viewer
+// granted a specific permission sees the matching controls without being
+// a full administrator. Account/user management stays admin-only (isAdmin()).
+function hasPermission(name) {
+  return !!currentUser && Array.isArray(currentUser.permissions) && currentUser.permissions.includes(name);
+}
+
 async function logout() {
   await api("/api/auth/logout", { method: "POST" });
   location.href = "/login.html";

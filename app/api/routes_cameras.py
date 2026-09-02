@@ -4,9 +4,10 @@ import shutil
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.deps import get_ptz_registry, get_settings, get_store, get_stream_manager, require_admin, require_auth
+from app.deps import get_motion_registry, get_ptz_registry, get_settings, get_store, get_stream_manager, require_auth, require_cameras_manage
 from app.ffmpeg_manager import StreamManager
 from app.models import Camera, CameraCreate, CameraUpdate, CameraWithStatus
+from app.motion import MotionRegistry
 from app.ptz_registry import PTZRegistry
 from app.store import CameraNotFound, CameraStore, DuplicateCameraId
 
@@ -25,7 +26,7 @@ def list_cameras(
     return [_with_status(c, manager) for c in store.list()]
 
 
-@router.post("", response_model=CameraWithStatus, status_code=201, dependencies=[Depends(require_admin)])
+@router.post("", response_model=CameraWithStatus, status_code=201, dependencies=[Depends(require_cameras_manage)])
 async def create_camera(
     payload: CameraCreate,
     store: CameraStore = Depends(get_store),
@@ -52,7 +53,7 @@ def get_camera(
     return _with_status(camera, manager)
 
 
-@router.patch("/{camera_id}", response_model=CameraWithStatus, dependencies=[Depends(require_admin)])
+@router.patch("/{camera_id}", response_model=CameraWithStatus, dependencies=[Depends(require_cameras_manage)])
 async def update_camera(
     camera_id: str,
     payload: CameraUpdate,
@@ -67,7 +68,7 @@ async def update_camera(
     return _with_status(camera, manager)
 
 
-@router.delete("/{camera_id}", status_code=204, dependencies=[Depends(require_admin)])
+@router.delete("/{camera_id}", status_code=204, dependencies=[Depends(require_cameras_manage)])
 async def delete_camera(
     camera_id: str,
     delete_recordings: bool = False,
@@ -75,6 +76,7 @@ async def delete_camera(
     manager: StreamManager = Depends(get_stream_manager),
     settings=Depends(get_settings),
     ptz_registry: PTZRegistry = Depends(get_ptz_registry),
+    motion_registry: MotionRegistry = Depends(get_motion_registry),
 ):
     try:
         store.delete(camera_id)
@@ -82,6 +84,7 @@ async def delete_camera(
         raise HTTPException(status_code=404, detail="Camera introuvable")
     await manager.reconcile(store.list())
     ptz_registry.invalidate(camera_id)
+    motion_registry.invalidate(camera_id)
     shutil.rmtree(settings.hls_dir / camera_id, ignore_errors=True)
     if delete_recordings:
         shutil.rmtree(settings.recordings_dir / camera_id, ignore_errors=True)

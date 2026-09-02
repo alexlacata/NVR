@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from app.config import Settings
-from app.deps import get_settings, get_store, require_admin, require_auth
+from app.deps import get_settings, get_store, require_auth, require_recordings_delete
 from app.recordings import RECORDING_NAME_RE, list_recording_segments
 from app.store import CameraNotFound, CameraStore
 
@@ -63,9 +63,15 @@ async def get_snapshot(
         raise HTTPException(status_code=404, detail="Aucune image disponible (camera hors ligne ?)")
     latest = segments[-1]
     proc = await asyncio.create_subprocess_exec(
+        # `-vf reverse` + `-frames:v 1` instead of `-sseof -1`: an HLS
+        # segment's mpegts container reports a nonzero stream start time,
+        # which throws off EOF-relative seeking and can silently yield
+        # zero output frames on some ffmpeg builds. Reversing and taking
+        # the first frame sidesteps seeking entirely - cheap here since a
+        # single HLS segment is only a couple of seconds of video.
         settings.ffmpeg_binary, "-y", "-nostdin", "-hide_banner", "-loglevel", "error",
-        "-sseof", "-1", "-i", str(latest),
-        "-frames:v", "1", "-q:v", "4", "-f", "image2", "pipe:1",
+        "-i", str(latest),
+        "-vf", "reverse", "-frames:v", "1", "-q:v", "4", "-f", "image2", "pipe:1",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -213,7 +219,7 @@ def get_recording(
     return FileResponse(path, media_type="video/mp4", filename=filename)
 
 
-@router.delete("/{camera_id}/recordings/{filename}", status_code=204, dependencies=[Depends(require_admin)])
+@router.delete("/{camera_id}/recordings/{filename}", status_code=204, dependencies=[Depends(require_recordings_delete)])
 def delete_recording(
     camera_id: str,
     filename: str,

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
 from app.deps import get_auth_service, get_settings, get_user_store, require_auth
-from app.models import PasswordChange, User
+from app.models import PasswordChange, User, effective_permissions
 from app.user_store import UserStore, pwd_context
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -54,7 +54,11 @@ def logout(response: Response):
 
 @router.get("/me")
 def me(user: User = Depends(require_auth)):
-    return {"username": user.username, "role": user.role}
+    return {
+        "username": user.username,
+        "role": user.role,
+        "permissions": sorted(p.value for p in effective_permissions(user)),
+    }
 
 
 @router.patch("/password")
