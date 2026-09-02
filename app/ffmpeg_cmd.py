@@ -1,4 +1,12 @@
-"""Builds ffmpeg command lines for the two per-camera pipelines:
+"""Builds ffmpeg command lines for the two per-camera pipelines.
+
+Supported source protocols: RTSP (the vast majority of IP cameras -
+Hikvision, Uniview, Dahua, Axis, Reolink and any ONVIF-compliant camera all
+speak it), RTMP, SRT, HTTP/MJPEG, a local USB/V4L2 device, and a synthetic
+test pattern. See app/onvif_client.py for ONVIF-based auto-discovery of a
+camera's RTSP stream URL.
+
+The two pipelines:
 
 - "record": copies/encodes the stream into fixed-length fragmented-MP4
   segment files on disk (the actual recording, for the hard drive). Keeps
@@ -39,6 +47,22 @@ def _input_spec(source_type: SourceType, url: str) -> InputSpec:
     if source_type == SourceType.rtsp:
         return InputSpec(
             pre_args=["-rtsp_transport", "tcp", "-fflags", "+genpts"],
+            in_args=["-i", url],
+            video_map=["-map", "0:v:0"],
+            audio_map=["-map", "0:a:0?"],
+            copy_ok=True,
+        )
+    if source_type == SourceType.rtmp:
+        return InputSpec(
+            pre_args=["-fflags", "+genpts"],
+            in_args=["-i", url],
+            video_map=["-map", "0:v:0"],
+            audio_map=["-map", "0:a:0?"],
+            copy_ok=True,
+        )
+    if source_type == SourceType.srt:
+        return InputSpec(
+            pre_args=["-fflags", "+genpts"],
             in_args=["-i", url],
             video_map=["-map", "0:v:0"],
             audio_map=["-map", "0:a:0?"],

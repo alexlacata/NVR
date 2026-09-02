@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 
 from app.models import Camera
-from app.onvif_ptz import OnvifPTZClient
+from app.onvif_client import OnvifPTZClient
 
 
 class PTZRegistry:

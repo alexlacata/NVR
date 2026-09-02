@@ -125,12 +125,12 @@ a { color: var(--accent); text-decoration: none; }
   padding: 60px 20px;
 }
 
-form.form-grid {
+form.form-grid, .field-grid {
   display: grid;
   gap: 12px;
   padding: 16px;
 }
-form.form-grid label {
+form.form-grid label, .field-grid label {
   display: block;
   font-size: 13px;
   color: var(--text-dim);
@@ -139,7 +139,11 @@ form.form-grid label {
 form.form-grid input[type=text],
 form.form-grid input[type=password],
 form.form-grid input[type=url],
-form.form-grid select {
+form.form-grid select,
+.field-grid input[type=text],
+.field-grid input[type=password],
+.field-grid input[type=url],
+.field-grid select {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
@@ -148,11 +152,13 @@ form.form-grid select {
   color: var(--text);
   font-size: 15px;
 }
-form.form-grid .row { display: flex; gap: 12px; flex-wrap: wrap; }
-form.form-grid .row > * { flex: 1; min-width: 140px; }
-form.form-grid .checkbox-row { display: flex; align-items: center; gap: 8px; }
-form.form-grid .checkbox-row input { width: 18px; height: 18px; }
-form.form-grid .actions { display: flex; gap: 10px; margin-top: 6px; }
+form.form-grid .row, .field-grid .row { display: flex; gap: 12px; flex-wrap: wrap; }
+form.form-grid .row > *, .field-grid .row > * { flex: 1; min-width: 140px; }
+form.form-grid .checkbox-row, .field-grid .checkbox-row { display: flex; align-items: center; gap: 8px; }
+form.form-grid .checkbox-row input, .field-grid .checkbox-row input { width: 18px; height: 18px; }
+form.form-grid .actions, .field-grid .actions { display: flex; gap: 10px; margin-top: 6px; }
+.field-grid + .field-grid { margin-top: 10px; }
+details > .field-grid:first-of-type { margin-top: 10px; }
 
 .error-msg { color: var(--err); font-size: 14px; min-height: 18px; }
 .hint { color: var(--text-dim); font-size: 12px; margin-top: -6px; }

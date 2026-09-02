@@ -40,12 +40,20 @@
   <div id="recordings"></div>
 
   <div class="section-title">Parametres de la camera</div>
+  <details style="margin-bottom:10px">
+    <summary style="cursor:pointer;color:var(--accent);font-size:13.5px;padding:8px 0">
+      Retrouver l'URL du flux : assistant par marque / detection ONVIF
+    </summary>
+    <div id="stream-helpers"></div>
+  </details>
   <div class="card">
     <form class="form-grid" id="edit-form">
       <div><label>Nom</label><input type="text" id="f-name"></div>
       <div><label>Type de source</label>
         <select id="f-type">
           <option value="rtsp">RTSP (camera IP)</option>
+          <option value="rtmp">RTMP</option>
+          <option value="srt">SRT</option>
           <option value="http">HTTP / MJPEG</option>
           <option value="usb">USB / peripherique local</option>
           <option value="test">Test (mire synthetique)</option>
@@ -438,10 +446,28 @@ document.getElementById("btn-delete").addEventListener("click", async () => {
 
 let systemInfo = null;
 
+function mountStreamHelpers() {
+  const host = document.getElementById("stream-helpers");
+  const setUrl = (url) => {
+    document.getElementById("f-url").value = url;
+    document.getElementById("f-type").value = "rtsp";
+    toast("URL principale renseignee - pensez a cliquer sur Enregistrer");
+  };
+  host.appendChild(buildBrandUrlWidget({
+    onUseUrl: setUrl,
+    onUseLiveUrl: (url) => {
+      document.getElementById("f-live-url").value = url;
+      toast("URL secondaire renseignee - pensez a cliquer sur Enregistrer");
+    },
+  }));
+  host.appendChild(buildOnvifDiscoveryWidget({ onUseUrl: setUrl }));
+}
+
 (async () => {
   await requireAuth();
   systemInfo = await apiJson("/api/system").catch(() => null);
   await loadCamera();
+  mountStreamHelpers();
   const today = localDateStr(new Date());
   document.getElementById("date-filter").value = today;
   await loadRecordings(today);

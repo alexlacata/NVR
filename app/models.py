@@ -11,7 +11,12 @@ _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-_]{1,63}$")
 
 
 class SourceType(str, Enum):
-    rtsp = "rtsp"       # rtsp://... IP camera
+    rtsp = "rtsp"       # rtsp://... IP camera - the vast majority of them
+                          # (Hikvision, Uniview, Dahua, Axis, Reolink, ONVIF...)
+    rtmp = "rtmp"       # rtmp(s)://... push-style stream (encoders, some NVR relays)
+    srt = "srt"         # srt://... low-latency, loss-resilient transport - a good
+                          # fit for a flaky cellular/Peplink uplink when the
+                          # camera or an intermediate encoder supports it
     http = "http"       # http(s):// MJPEG/HTTP video stream
     usb = "usb"         # local capture device, e.g. /dev/video0
     test = "test"       # synthetic test pattern, useful to validate the pipeline
@@ -60,10 +65,14 @@ class CameraBase(BaseModel):
     def validate_url(cls, v: str, info) -> str:
         source_type = info.data.get("source_type")
         v = v.strip()
-        if source_type == SourceType.rtsp and not v.startswith("rtsp://"):
-            raise ValueError("L'URL d'une camera RTSP doit commencer par rtsp://")
-        if source_type == SourceType.http and not (v.startswith("http://") or v.startswith("https://")):
-            raise ValueError("L'URL d'une camera HTTP doit commencer par http:// ou https://")
+        required_scheme = {
+            SourceType.rtsp: ("rtsp://",),
+            SourceType.rtmp: ("rtmp://", "rtmps://"),
+            SourceType.srt: ("srt://",),
+            SourceType.http: ("http://", "https://"),
+        }.get(source_type)
+        if required_scheme and not v.startswith(required_scheme):
+            raise ValueError(f"L'URL doit commencer par {' ou '.join(required_scheme)}")
         return v
 
     @field_validator("live_scale")

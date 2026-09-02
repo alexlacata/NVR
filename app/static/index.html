@@ -135,6 +135,8 @@ function openAddModal() {
   const nameInput = el("input", { type: "text", required: "" });
   const typeSelect = el("select", {}, [
     el("option", { value: "rtsp" }, "RTSP (camera IP)"),
+    el("option", { value: "rtmp" }, "RTMP"),
+    el("option", { value: "srt" }, "SRT"),
     el("option", { value: "http" }, "HTTP / MJPEG"),
     el("option", { value: "usb" }, "USB / peripherique local"),
     el("option", { value: "test" }, "Test (mire synthetique)"),
@@ -142,6 +144,14 @@ function openAddModal() {
   const urlInput = el("input", { type: "text", placeholder: "rtsp://utilisateur:motdepasse@192.168.1.50:554/stream1" });
   const liveUrlInput = el("input", { type: "text", placeholder: "(optionnel) sous-flux basse resolution pour le direct" });
   const recordCheckbox = el("input", { type: "checkbox", checked: "" });
+
+  const brandWidget = buildBrandUrlWidget({
+    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("URL principale renseignee"); },
+    onUseLiveUrl: (url) => { liveUrlInput.value = url; toast("URL secondaire renseignee"); },
+  });
+  const onvifWidget = buildOnvifDiscoveryWidget({
+    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("URL renseignee depuis ONVIF"); },
+  });
 
   const form = el("form", { class: "form-grid", onsubmit: async (ev) => {
     ev.preventDefault();
@@ -177,12 +187,20 @@ function openAddModal() {
     ]),
   ]);
 
+  const helpers = el("details", { style: "margin:0 16px 4px" }, [
+    el("summary", { style: "cursor:pointer;color:var(--accent);font-size:13.5px;padding:8px 0" },
+      "Je ne connais pas l'URL : assistant par marque / detection ONVIF"),
+    brandWidget,
+    onvifWidget,
+  ]);
+
   root.appendChild(el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === e.currentTarget) closeModal(); } }, [
     el("div", { class: "modal" }, [
       el("div", { class: "modal-header" }, [
         el("h2", {}, "Ajouter une camera"),
         el("button", { class: "close-btn", onclick: closeModal }, "×"),
       ]),
+      helpers,
       form,
     ]),
   ]));

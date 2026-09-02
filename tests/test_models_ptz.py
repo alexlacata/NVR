@@ -37,3 +37,19 @@ def test_live_max_bitrate_bounds():
         Camera(**_base(live_max_bitrate_kbps=10))  # below minimum
     cam = Camera(**_base(live_max_bitrate_kbps=800))
     assert cam.live_max_bitrate_kbps == 800
+
+
+def test_rtmp_url_must_start_with_rtmp_scheme():
+    with pytest.raises(ValidationError):
+        Camera(**_base(source_type=SourceType.rtmp, url="rtsp://x/1"))
+    cam = Camera(**_base(source_type=SourceType.rtmp, url="rtmp://x/live/stream1"))
+    assert cam.url == "rtmp://x/live/stream1"
+    cam2 = Camera(**_base(source_type=SourceType.rtmp, url="rtmps://x/live/stream1"))
+    assert cam2.url == "rtmps://x/live/stream1"
+
+
+def test_srt_url_must_start_with_srt_scheme():
+    with pytest.raises(ValidationError):
+        Camera(**_base(source_type=SourceType.srt, url="rtsp://x/1"))
+    cam = Camera(**_base(source_type=SourceType.srt, url="srt://x:9000"))
+    assert cam.url == "srt://x:9000"

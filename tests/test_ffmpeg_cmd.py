@@ -74,3 +74,25 @@ def test_record_leg_ignores_live_bandwidth_caps(tmp_path: Path):
     assert "-c" in cmd and "copy" in cmd  # recording stays full quality/stream-copy
     assert "-b:v" not in cmd
     assert "-vf" not in cmd
+
+
+def test_rtmp_source_stream_copies(tmp_path: Path):
+    cam = _camera(source_type=SourceType.rtmp, url="rtmp://x/live/stream1")
+    cmd = build_record_cmd("ffmpeg", cam, tmp_path, segment_seconds=600)
+    assert "rtmp://x/live/stream1" in cmd
+    assert "-c" in cmd and "copy" in cmd
+    assert "0:a:0?" in cmd
+
+
+def test_srt_source_stream_copies(tmp_path: Path):
+    cam = _camera(source_type=SourceType.srt, url="srt://x:9000?streamid=cam1")
+    cmd = build_record_cmd("ffmpeg", cam, tmp_path, segment_seconds=600)
+    assert "srt://x:9000?streamid=cam1" in cmd
+    assert "-c" in cmd and "copy" in cmd
+
+
+def test_srt_live_leg_is_video_only_and_copy(tmp_path: Path):
+    cam = _camera(source_type=SourceType.srt, url="srt://x:9000")
+    cmd = build_live_cmd("ffmpeg", cam, tmp_path, hls_segment_seconds=2, hls_list_size=6)
+    assert "-c:v" in cmd and "copy" in cmd
+    assert "0:a" not in " ".join(cmd)

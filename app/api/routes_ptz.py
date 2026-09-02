@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.deps import get_ptz_registry, get_store, require_auth
 from app.models import Camera
-from app.onvif_ptz import OnvifError
+from app.onvif_client import OnvifError
 from app.ptz_registry import PTZRegistry
 from app.store import CameraNotFound, CameraStore
 

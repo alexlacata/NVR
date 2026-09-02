@@ -1,9 +1,11 @@
 # NVR
 
 Un enregistreur vidéo réseau (NVR) auto-hébergé : il ingère plusieurs flux
-vidéo (caméras IP RTSP, caméra USB, flux HTTP/MJPEG), les enregistre en
-continu sur un disque dur, et sert de passerelle pour les regarder en direct
-ou en différé depuis un téléphone ou un ordinateur, via un navigateur web.
+vidéo (RTSP, RTMP, SRT, HTTP/MJPEG, caméra USB) de n'importe quelle marque
+compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, ...), les
+enregistre en continu sur un disque dur, et sert de passerelle pour les
+regarder en direct ou en différé depuis un téléphone ou un ordinateur, via
+un navigateur web.
 
 ## Fonctionnalités
 
@@ -25,6 +27,10 @@ ou en différé depuis un téléphone ou un ordinateur, via un navigateur web.
 - **Ligne du temps et vignettes** : relecture par simple clic sur une ligne
   du temps 24h ou sur une bande de vignettes, générées à intervalle
   configurable à partir des enregistrements déjà sur le disque.
+- **Multi-protocole et multi-marque** : RTSP, RTMP, SRT, HTTP/MJPEG, USB.
+  Détection automatique du flux via ONVIF (Hikvision, Uniview, Dahua, Axis,
+  Reolink et toute caméra compatible), avec recherche sur le réseau local ou
+  assistant de configuration par marque en secours.
 
 ## Architecture en bref
 
@@ -70,6 +76,14 @@ docker compose up -d --build
 
 L'interface est alors disponible sur `http://<ip-de-la-machine>:8000`.
 
+> **Recherche de caméras sur le réseau (WS-Discovery) en Docker** : le
+> réseau `bridge` par défaut ne transmet pas le trafic multicast utilisé
+> pour découvrir les caméras ONVIF automatiquement. Pour que le bouton
+> **Rechercher sur le réseau** fonctionne, décommentez `network_mode: host`
+> dans `docker-compose.yml` (Linux uniquement). Ce n'est pas nécessaire pour
+> le reste de l'application, ni pour la détection ONVIF quand vous
+> connaissez déjà l'adresse IP de la caméra.
+
 ## Démarrage rapide (sans Docker)
 
 Prérequis : Python 3.11+, `ffmpeg` installé (`apt install ffmpeg` sur
@@ -95,6 +109,11 @@ Dans l'interface, cliquez sur **+ Camera** et renseignez :
     `rtsp://utilisateur:motdepasse@192.168.1.50:554/stream1` (consultez la
     documentation de votre caméra pour le chemin exact ; par exemple
     `/Streaming/Channels/101` pour beaucoup de caméras Hikvision/Dahua-like).
+  - `RTMP` : flux poussé par un encodeur ou un relais (`rtmp://...` ou
+    `rtmps://...`).
+  - `SRT` : transport à faible latence, résistant aux pertes — un bon choix
+    quand la caméra ou un encodeur intermédiaire le propose sur une liaison
+    4G/Peplink (`srt://...`).
   - `HTTP / MJPEG` : flux HTTP MJPEG (`http://.../video`).
   - `USB` : caméra/webcam branchée en local, URL = chemin du périphérique,
     ex. `/dev/video0` (nécessite de passer le périphérique au conteneur, voir
@@ -105,6 +124,29 @@ Dans l'interface, cliquez sur **+ Camera** et renseignez :
   "sous-flux" basse résolution, indiquez-le ici pour le direct — cela réduit
   la charge CPU et la bande passante vers le téléphone, tout en gardant le
   flux principal en haute résolution pour l'enregistrement.
+
+### Vous ne connaissez pas l'URL de la caméra ?
+
+Dans le formulaire d'ajout (et sur la page de chaque caméra), dépliez
+**"Je ne connais pas l'URL"** pour deux assistants :
+
+- **Détection ONVIF** : renseignez l'URL du service ONVIF de la caméra
+  (`http://<ip>:<port>/onvif/device_service`, port souvent `80` ou `8080`)
+  et les identifiants, puis cliquez sur **Détecter les flux** — le serveur
+  interroge directement la caméra et vous propose ses flux RTSP disponibles
+  (avec leur résolution) à utiliser d'un clic. Fonctionne avec toute caméra
+  compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, et la plupart
+  des marques récentes), sans code spécifique par marque. Le bouton
+  **Rechercher sur le réseau** balaie le réseau local (WS-Discovery) pour
+  lister les caméras ONVIF présentes sans connaître leur adresse IP à
+  l'avance — voir la note Docker ci-dessous pour que cela fonctionne en
+  conteneur.
+- **Assistant par marque** : si la caméra n'a pas ONVIF activé, choisissez
+  sa marque (Hikvision, Uniview, Dahua, Axis, Reolink), renseignez
+  IP/port/identifiants/canal, et l'URL RTSP est composée automatiquement
+  selon le schéma habituel de cette marque. Ces schémas sont les plus
+  courants mais peuvent varier selon le modèle/firmware — préférez la
+  détection ONVIF quand c'est possible.
 
 Le PTZ et la limite de bande passante du direct se configurent ensuite sur
 la page de la caméra (section *Bande passante du direct* et *PTZ*).
@@ -229,9 +271,10 @@ app/
   recordings.py         nommage/parcours des segments enregistrés (partagé)
   thumbnails.py          extraction des vignettes depuis les segments termines
   auth.py              authentification par session
-  onvif_ptz.py          client ONVIF (pilotage PTZ)
+  onvif_client.py        client ONVIF (PTZ + decouverte des flux media)
+  onvif_discovery.py      recherche de cameras ONVIF sur le reseau (WS-Discovery)
   ptz_registry.py        cache des clients PTZ par caméra
-  api/                 routes FastAPI (auth, caméras, médias, PTZ, système)
+  api/                 routes FastAPI (auth, caméras, médias, PTZ, ONVIF, système)
   static/              interface web (HTML/CSS/JS, sans build)
 tests/                 tests automatisés (pytest)
 ```

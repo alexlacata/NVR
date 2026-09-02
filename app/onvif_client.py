@@ -1,13 +1,19 @@
-"""Minimal ONVIF client for PTZ (pan/tilt/zoom) control.
+"""Minimal ONVIF client: PTZ (pan/tilt/zoom) control and media/stream
+discovery.
 
 Implemented by hand against the ONVIF SOAP/WS-Security spec instead of
-pulling in a full ONVIF/zeep dependency: PTZ control is a handful of simple,
-stable SOAP calls (GetServices, GetProfiles, ContinuousMove, Stop,
-GetPresets, SetPreset, GotoPreset, RemovePreset), and this keeps the
-dependency footprint small.
+pulling in a full ONVIF/zeep dependency: this only needs a handful of
+simple, stable SOAP calls (GetServices, GetProfiles, GetStreamUri,
+ContinuousMove, Stop, GetPresets, SetPreset, GotoPreset, RemovePreset), and
+hand-rolling them keeps the dependency footprint small.
+
+ONVIF is what makes this generic across camera brands: Hikvision, Uniview,
+Dahua, Axis, Reolink and effectively every modern IP camera implement the
+same ONVIF Profile S/T services, so a single client here covers all of
+them rather than needing a vendor-specific integration each.
 
 Reference: ONVIF Core Specification (WS-Security UsernameToken digest) and
-the ONVIF PTZ service WSDL (ver20/ptz/wsdl).
+the ONVIF Media (ver10/media/wsdl) and PTZ (ver20/ptz/wsdl) service WSDLs.
 """
 from __future__ import annotations
 
@@ -17,6 +23,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import quote, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -223,3 +230,84 @@ class OnvifPTZClient:
                 "</RemovePreset>"
             )
             await _soap_call(client, self._ptz_url, self.username, self.password, body)
+
+
+@dataclass
+class MediaProfile:
+    token: str
+    name: str
+    resolution: Optional[str]  # "1920x1080", or None if not reported
+    stream_uri: Optional[str]  # rtsp:// URL for this profile, credentials embedded
+
+
+def _embed_credentials(uri: str, username: str, password: str) -> str:
+    """ONVIF's GetStreamUri normally returns a bare rtsp:// URL - the
+    camera expects the same ONVIF username/password at the RTSP level.
+    Embed them so the URL is directly usable as a Camera.url."""
+    if not username or not uri:
+        return uri
+    parts = urlsplit(uri)
+    if "@" in parts.netloc:
+        return uri  # already carries credentials
+    netloc = f"{quote(username, safe='')}:{quote(password, safe='')}@{parts.netloc}"
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+
+
+async def probe_media(device_url: str, username: str, password: str) -> list[MediaProfile]:
+    """Discover the media profiles (and their RTSP stream URLs) an
+    ONVIF-compliant camera exposes. Works for any brand - Hikvision,
+    Uniview, Dahua, Axis, Reolink, ... - without vendor-specific code,
+    and needs no PTZ support on the camera."""
+    username = username or ""
+    password = password or ""
+    async with httpx.AsyncClient() as client:
+        root = await _soap_call(
+            client, device_url, username, password,
+            '<GetServices xmlns="http://www.onvif.org/ver10/device/wsdl"><IncludeCapability>false</IncludeCapability></GetServices>',
+        )
+        media_url = None
+        for service in root.findall(".//device:Service", NS):
+            namespace = service.findtext("device:Namespace", default="", namespaces=NS) or ""
+            if namespace.endswith("/ver10/media/wsdl"):
+                media_url = service.findtext("device:XAddr", default="", namespaces=NS)
+        if not media_url:
+            raise OnvifError("Cette camera ne semble pas exposer de service media ONVIF")
+
+        root = await _soap_call(
+            client, media_url, username, password,
+            '<GetProfiles xmlns="http://www.onvif.org/ver10/media/wsdl"/>',
+        )
+        profiles: list[MediaProfile] = []
+        for p in root.findall(".//media:Profiles", NS):
+            token = p.get("token", "")
+            name = p.findtext("media:Name", default=token, namespaces=NS) or token
+
+            resolution = None
+            vres = p.find(".//tt:VideoEncoderConfiguration/tt:Resolution", NS)
+            if vres is not None:
+                w = vres.findtext("tt:Width", default="", namespaces=NS)
+                h = vres.findtext("tt:Height", default="", namespaces=NS)
+                if w and h:
+                    resolution = f"{w}x{h}"
+
+            stream_uri = None
+            stream_body = (
+                '<GetStreamUri xmlns="http://www.onvif.org/ver10/media/wsdl">'
+                '<StreamSetup>'
+                '<Stream xmlns="http://www.onvif.org/ver10/schema">RTP-Unicast</Stream>'
+                '<Transport xmlns="http://www.onvif.org/ver10/schema"><Protocol>RTSP</Protocol></Transport>'
+                '</StreamSetup>'
+                f'<ProfileToken>{token}</ProfileToken>'
+                '</GetStreamUri>'
+            )
+            try:
+                stream_root = await _soap_call(client, media_url, username, password, stream_body)
+                uri = stream_root.findtext(".//media:MediaUri/media:Uri", default="", namespaces=NS)
+                if uri:
+                    stream_uri = _embed_credentials(uri, username, password)
+            except OnvifError:
+                pass  # this profile just won't have a stream_uri; others might
+
+            profiles.append(MediaProfile(token=token, name=name, resolution=resolution, stream_uri=stream_uri))
+
+        return profiles

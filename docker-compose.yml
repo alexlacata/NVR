@@ -18,3 +18,8 @@ services:
     # Pour une camera USB, decommentez et adaptez :
     # devices:
     #   - /dev/video0:/dev/video0
+    # Pour que "Rechercher sur le reseau" (decouverte ONVIF / WS-Discovery)
+    # trouve les cameras : le reseau bridge par defaut ne transmet pas le
+    # trafic multicast. Decommentez (Linux uniquement ; le mapping "ports"
+    # ci-dessus devient alors inutile, le conteneur partage le reseau hote) :
+    # network_mode: host
