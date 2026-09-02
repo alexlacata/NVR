@@ -183,6 +183,14 @@ class StreamManager:
                 self._sync_camera_state(camera)
             self._configs[camera.id] = camera
 
+    async def restart_all(self, cameras: list[Camera]) -> None:
+        """Force every camera's legs to restart, even if their config
+        didn't change - used after a server-wide setting (segment length,
+        HLS window, ...) is edited, so the new value takes effect on
+        streams that are already running."""
+        self._configs.clear()
+        await self.reconcile(cameras)
+
     def _start_camera(self, camera: Camera) -> None:
         legs: dict[str, _Leg] = {}
 

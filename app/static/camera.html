@@ -11,6 +11,7 @@
   <h1><a href="/index.html" style="color:inherit">←</a> <span id="cam-title">Camera</span></h1>
   <div class="actions">
     <span id="cam-badge"></span>
+    <a class="btn secondary" href="/settings.html">Parametres</a>
   </div>
 </div>
 <div class="container">
@@ -39,6 +40,7 @@
 
   <div id="recordings"></div>
 
+  <div id="admin-settings-section">
   <div class="section-title">Parametres de la camera</div>
   <details style="margin-bottom:10px">
     <summary style="cursor:pointer;color:var(--accent);font-size:13.5px;padding:8px 0">
@@ -91,6 +93,7 @@
         <button type="button" class="btn danger" id="btn-delete">Supprimer la camera</button>
       </div>
     </form>
+  </div>
   </div>
 </div>
 
@@ -283,7 +286,7 @@ async function loadRecordings(date) {
     files.forEach((f) => {
       const playBtn = el("button", { class: "icon-btn", onclick: () => playRecording(f) }, "▶ Lire");
       const dlLink = el("a", { class: "icon-btn", href: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}`, download: f.filename }, "⬇");
-      const delBtn = el("button", { class: "icon-btn", onclick: () => deleteRecording(f) }, "🗑");
+      const delBtn = isAdmin() ? el("button", { class: "icon-btn", onclick: () => deleteRecording(f) }, "🗑") : null;
       list.appendChild(el("div", { class: "rec-item" }, [
         el("span", {}, `${f.time} - ${fmtBytes(f.size_bytes)}`),
         el("div", { class: "rec-actions" }, [playBtn, dlLink, delBtn]),
@@ -465,9 +468,12 @@ function mountStreamHelpers() {
 
 (async () => {
   await requireAuth();
+  if (!isAdmin()) {
+    document.getElementById("admin-settings-section").hidden = true;
+  }
   systemInfo = await apiJson("/api/system").catch(() => null);
   await loadCamera();
-  mountStreamHelpers();
+  if (isAdmin()) mountStreamHelpers();
   const today = localDateStr(new Date());
   document.getElementById("date-filter").value = today;
   await loadRecordings(today);

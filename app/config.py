@@ -15,7 +15,10 @@ class Settings(BaseSettings):
     # mounted hard drive, e.g. /mnt/nvr-disk.
     data_dir: Path = Path("data")
 
-    # Auth
+    # Auth. admin_username/admin_password only seed the initial admin
+    # account the first time the server starts (when no users exist yet) -
+    # once created, manage accounts from the web UI; changing these env
+    # vars afterwards has no further effect.
     admin_username: str = "admin"
     admin_password: str = "changeme"
     secret_key: str = ""  # auto-generated and persisted if left blank
@@ -51,6 +54,14 @@ class Settings(BaseSettings):
     @property
     def cameras_file(self) -> Path:
         return self.config_dir / "cameras.yaml"
+
+    @property
+    def users_file(self) -> Path:
+        return self.config_dir / "users.yaml"
+
+    @property
+    def runtime_settings_file(self) -> Path:
+        return self.config_dir / "settings.yaml"
 
     @property
     def recordings_dir(self) -> Path:

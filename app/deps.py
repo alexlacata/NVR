@@ -5,8 +5,11 @@ from fastapi import HTTPException, Request, status
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
 from app.ffmpeg_manager import StreamManager
+from app.models import User, UserRole
 from app.ptz_registry import PTZRegistry
+from app.settings_store import SettingsStore
 from app.store import CameraStore
+from app.user_store import UserStore
 
 
 def get_settings(request: Request) -> Settings:
@@ -15,6 +18,10 @@ def get_settings(request: Request) -> Settings:
 
 def get_store(request: Request) -> CameraStore:
     return request.app.state.store
+
+
+def get_user_store(request: Request) -> UserStore:
+    return request.app.state.user_store
 
 
 def get_stream_manager(request: Request) -> StreamManager:
@@ -29,13 +36,25 @@ def get_ptz_registry(request: Request) -> PTZRegistry:
     return request.app.state.ptz_registry
 
 
-def require_auth(request: Request) -> str:
+def get_settings_store(request: Request) -> SettingsStore:
+    return request.app.state.settings_store
+
+
+def require_auth(request: Request) -> User:
     auth_service: AuthService = request.app.state.auth_service
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         authorization = request.headers.get("authorization", "")
         if authorization.lower().startswith("bearer "):
             token = authorization[7:]
-    if not token or not auth_service.verify_token(token):
+    user = auth_service.verify_token(token) if token else None
+    if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise")
-    return token
+    return user
+
+
+def require_admin(request: Request) -> User:
+    user = require_auth(request)
+    if user.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Reserve aux administrateurs")
+    return user

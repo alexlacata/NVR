@@ -10,7 +10,8 @@
 <div class="topbar">
   <h1>📹 NVR</h1>
   <div class="actions">
-    <button class="btn secondary" id="btn-add">+ Camera</button>
+    <button class="btn secondary" id="btn-add" hidden>+ Camera</button>
+    <a class="btn secondary" href="/settings.html">Parametres</a>
     <button class="btn secondary" id="btn-logout">Deconnexion</button>
   </div>
 </div>
@@ -81,7 +82,7 @@ async function loadCameras() {
     grid.innerHTML = "";
     grid.appendChild(el("div", { class: "empty-state" }, [
       el("p", {}, "Aucune camera configuree."),
-      el("button", { class: "btn", onclick: () => openAddModal() }, "Ajouter une camera"),
+      isAdmin() ? el("button", { class: "btn", onclick: () => openAddModal() }, "Ajouter une camera") : null,
     ]));
     grid.dataset.emptyShown = "1";
     return;
@@ -211,6 +212,7 @@ document.getElementById("btn-logout").addEventListener("click", logout);
 
 (async () => {
   await requireAuth();
+  document.getElementById("btn-add").hidden = !isAdmin();
   await loadDisk();
   await loadCameras();
   setInterval(loadCameras, 15000);

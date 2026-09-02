@@ -146,3 +146,72 @@ class CameraStatus(BaseModel):
 
 class CameraWithStatus(Camera):
     status: CameraStatus
+
+
+_USERNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}$")
+
+
+class UserRole(str, Enum):
+    admin = "admin"     # manages cameras, users, server settings
+    viewer = "viewer"   # views live/recordings and operates PTZ, nothing else
+
+
+class UserBase(BaseModel):
+    username: str
+    role: UserRole = UserRole.viewer
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        v = v.strip()
+        if not _USERNAME_RE.match(v):
+            raise ValueError(
+                "Le nom d'utilisateur doit faire 3-64 caracteres : lettres, chiffres, "
+                "points, tirets ou underscores, et ne peut pas commencer par un symbole"
+            )
+        return v
+
+
+class UserCreate(UserBase):
+    password: str = Field(min_length=8, max_length=200)
+
+
+class UserUpdate(BaseModel):
+    role: Optional[UserRole] = None
+    password: Optional[str] = Field(default=None, min_length=8, max_length=200)
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+class User(UserBase):
+    password_hash: str
+    created_at: str
+
+
+class UserPublic(UserBase):
+    created_at: str
+
+
+class RuntimeSettingsUpdate(BaseModel):
+    retention_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    min_free_disk_percent: Optional[float] = Field(default=None, ge=0, le=90)
+    segment_seconds: Optional[int] = Field(default=None, ge=10, le=3600)
+    hls_segment_seconds: Optional[int] = Field(default=None, ge=1, le=30)
+    hls_list_size: Optional[int] = Field(default=None, ge=2, le=50)
+    thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
+    thumbnail_check_interval_seconds: Optional[int] = Field(default=None, ge=5, le=600)
+    retention_check_interval_seconds: Optional[int] = Field(default=None, ge=10, le=3600)
+
+
+class RuntimeSettingsOut(BaseModel):
+    retention_days: int
+    min_free_disk_percent: float
+    segment_seconds: int
+    hls_segment_seconds: int
+    hls_list_size: int
+    thumbnail_interval_seconds: int
+    thumbnail_check_interval_seconds: int
+    retention_check_interval_seconds: int

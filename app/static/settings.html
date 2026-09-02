@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NVR - Parametres</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1><a href="/index.html" style="color:inherit">←</a> Parametres</h1>
+  <div class="actions">
+    <button class="btn secondary" id="btn-logout">Deconnexion</button>
+  </div>
+</div>
+<div class="container">
+
+  <div class="section-title">Mon compte</div>
+  <div class="card" style="padding:16px 18px">
+    <p class="hint" id="whoami" style="margin-top:0"></p>
+    <form class="form-grid" id="password-form">
+      <div><label>Mot de passe actuel</label><input type="password" id="pw-current" autocomplete="current-password"></div>
+      <div><label>Nouveau mot de passe (8 caracteres minimum)</label><input type="password" id="pw-new" autocomplete="new-password"></div>
+      <div class="error-msg" id="pw-error"></div>
+      <div><button type="submit" class="btn">Changer le mot de passe</button></div>
+    </form>
+  </div>
+
+  <div id="admin-sections" hidden>
+
+    <div class="section-title">Utilisateurs</div>
+    <div class="card" style="padding:16px 18px">
+      <div id="users-list" class="rec-list"></div>
+
+      <div class="hint" style="margin-top:14px">Ajouter un compte</div>
+      <form class="form-grid" id="add-user-form">
+        <div class="row">
+          <div><label>Nom d'utilisateur</label><input type="text" id="nu-username"></div>
+          <div><label>Mot de passe</label><input type="password" id="nu-password" autocomplete="new-password"></div>
+        </div>
+        <div><label>Role</label>
+          <select id="nu-role">
+            <option value="viewer">Lecteur (voir les cameras, piloter le PTZ)</option>
+            <option value="admin">Administrateur (configuration complete)</option>
+          </select>
+        </div>
+        <div class="error-msg" id="add-user-error"></div>
+        <div><button type="submit" class="btn secondary">Ajouter l'utilisateur</button></div>
+      </form>
+    </div>
+
+    <div class="section-title">Parametres serveur</div>
+    <div class="card" style="padding:16px 18px">
+      <form class="form-grid" id="server-form">
+        <div class="row">
+          <div><label>Retention des enregistrements (jours)</label><input type="text" inputmode="numeric" id="s-retention-days"></div>
+          <div><label>Espace disque libre minimum (%)</label><input type="text" inputmode="numeric" id="s-min-free-disk"></div>
+        </div>
+        <div class="hint">Sous ce seuil, les enregistrements les plus anciens sont purges automatiquement.</div>
+
+        <div class="row">
+          <div><label>Duree d'un fichier d'enregistrement (secondes)</label><input type="text" inputmode="numeric" id="s-segment-seconds"></div>
+          <div><label>Taille des segments HLS (secondes)</label><input type="text" inputmode="numeric" id="s-hls-segment-seconds"></div>
+        </div>
+        <div class="row">
+          <div><label>Segments HLS conserves dans la playlist</label><input type="text" inputmode="numeric" id="s-hls-list-size"></div>
+          <div><label>Intervalle des vignettes par defaut (secondes)</label><input type="text" inputmode="numeric" id="s-thumb-interval"></div>
+        </div>
+        <div class="row">
+          <div><label>Frequence de verification des vignettes (secondes)</label><input type="text" inputmode="numeric" id="s-thumb-check-interval"></div>
+          <div><label>Frequence de verification de la retention (secondes)</label><input type="text" inputmode="numeric" id="s-retention-check-interval"></div>
+        </div>
+        <div class="hint">Les flux en cours redemarrent brievement apres l'enregistrement pour appliquer les nouveaux reglages.</div>
+        <div class="error-msg" id="server-error"></div>
+        <div><button type="submit" class="btn">Enregistrer les parametres</button></div>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+document.getElementById("btn-logout").addEventListener("click", logout);
+
+async function loadUsers() {
+  const listEl = document.getElementById("users-list");
+  listEl.innerHTML = '<div class="spinner-row">Chargement...</div>';
+  const users = await apiJson("/api/users");
+  listEl.innerHTML = "";
+  users.forEach((u) => {
+    const roleSelect = el("select", { style: "width:auto", onchange: async () => {
+      try {
+        await apiJson(`/api/users/${encodeURIComponent(u.username)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ role: roleSelect.value }),
+        });
+        toast(`Role de ${u.username} mis a jour`);
+      } catch (e) {
+        toast(e.message);
+        await loadUsers();
+      }
+    }}, [
+      el("option", { value: "viewer" }, "Lecteur"),
+      el("option", { value: "admin" }, "Administrateur"),
+    ]);
+    roleSelect.value = u.role;
+    const isSelf = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
+    const delBtn = el("button", {
+      class: "icon-btn del",
+      disabled: isSelf ? "" : null,
+      title: isSelf ? "Vous ne pouvez pas supprimer votre propre compte" : "Supprimer",
+      onclick: async () => {
+        if (!confirm(`Supprimer le compte "${u.username}" ?`)) return;
+        try {
+          await apiJson(`/api/users/${encodeURIComponent(u.username)}`, { method: "DELETE" });
+          toast("Utilisateur supprime");
+          await loadUsers();
+        } catch (e) {
+          toast(e.message);
+        }
+      },
+    }, "🗑");
+    listEl.appendChild(el("div", { class: "rec-item" }, [
+      el("span", {}, u.username + (isSelf ? " (vous)" : "")),
+      el("div", { class: "rec-actions", style: "align-items:center" }, [roleSelect, delBtn]),
+    ]));
+  });
+}
+
+document.getElementById("add-user-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("add-user-error");
+  errorEl.textContent = "";
+  try {
+    await apiJson("/api/users", {
+      method: "POST",
+      body: JSON.stringify({
+        username: document.getElementById("nu-username").value,
+        password: document.getElementById("nu-password").value,
+        role: document.getElementById("nu-role").value,
+      }),
+    });
+    document.getElementById("add-user-form").reset();
+    toast("Utilisateur ajoute");
+    await loadUsers();
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
+document.getElementById("password-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("pw-error");
+  errorEl.textContent = "";
+  try {
+    await apiJson("/api/auth/password", {
+      method: "PATCH",
+      body: JSON.stringify({
+        current_password: document.getElementById("pw-current").value,
+        new_password: document.getElementById("pw-new").value,
+      }),
+    });
+    document.getElementById("password-form").reset();
+    toast("Mot de passe modifie");
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
+async function loadServerSettings() {
+  const s = await apiJson("/api/settings");
+  document.getElementById("s-retention-days").value = s.retention_days;
+  document.getElementById("s-min-free-disk").value = s.min_free_disk_percent;
+  document.getElementById("s-segment-seconds").value = s.segment_seconds;
+  document.getElementById("s-hls-segment-seconds").value = s.hls_segment_seconds;
+  document.getElementById("s-hls-list-size").value = s.hls_list_size;
+  document.getElementById("s-thumb-interval").value = s.thumbnail_interval_seconds;
+  document.getElementById("s-thumb-check-interval").value = s.thumbnail_check_interval_seconds;
+  document.getElementById("s-retention-check-interval").value = s.retention_check_interval_seconds;
+}
+
+document.getElementById("server-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("server-error");
+  errorEl.textContent = "";
+  const num = (id) => {
+    const v = document.getElementById(id).value.trim();
+    return v ? Number(v) : null;
+  };
+  try {
+    await apiJson("/api/settings", {
+      method: "PATCH",
+      body: JSON.stringify({
+        retention_days: num("s-retention-days"),
+        min_free_disk_percent: num("s-min-free-disk"),
+        segment_seconds: num("s-segment-seconds"),
+        hls_segment_seconds: num("s-hls-segment-seconds"),
+        hls_list_size: num("s-hls-list-size"),
+        thumbnail_interval_seconds: num("s-thumb-interval"),
+        thumbnail_check_interval_seconds: num("s-thumb-check-interval"),
+        retention_check_interval_seconds: num("s-retention-check-interval"),
+      }),
+    });
+    toast("Parametres enregistres");
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
+(async () => {
+  await requireAuth();
+  document.getElementById("whoami").textContent =
+    `Connecte en tant que ${currentUser.username} (${currentUser.role === "admin" ? "administrateur" : "lecteur"}).`;
+  if (isAdmin()) {
+    document.getElementById("admin-sections").hidden = false;
+    await loadUsers();
+    await loadServerSettings();
+  }
+})();
+</script>
+</body>
+</html>

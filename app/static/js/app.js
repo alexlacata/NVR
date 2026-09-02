@@ -26,12 +26,21 @@ async function apiJson(path, options = {}) {
   return data;
 }
 
+let currentUser = null;
+
+// Fetches the current user (username + role) and redirects to the login
+// page on 401. Also used by pages to hide admin-only controls for viewers.
 async function requireAuth() {
   try {
-    await apiJson("/api/auth/me");
+    currentUser = await apiJson("/api/auth/me");
   } catch (e) {
     // apiJson already redirects on 401
   }
+  return currentUser;
+}
+
+function isAdmin() {
+  return !!currentUser && currentUser.role === "admin";
 }
 
 async function logout() {

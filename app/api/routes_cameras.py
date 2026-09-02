@@ -4,7 +4,7 @@ import shutil
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.deps import get_ptz_registry, get_settings, get_store, get_stream_manager, require_auth
+from app.deps import get_ptz_registry, get_settings, get_store, get_stream_manager, require_admin, require_auth
 from app.ffmpeg_manager import StreamManager
 from app.models import Camera, CameraCreate, CameraUpdate, CameraWithStatus
 from app.ptz_registry import PTZRegistry
@@ -25,7 +25,7 @@ def list_cameras(
     return [_with_status(c, manager) for c in store.list()]
 
 
-@router.post("", response_model=CameraWithStatus, status_code=201)
+@router.post("", response_model=CameraWithStatus, status_code=201, dependencies=[Depends(require_admin)])
 async def create_camera(
     payload: CameraCreate,
     store: CameraStore = Depends(get_store),
@@ -52,7 +52,7 @@ def get_camera(
     return _with_status(camera, manager)
 
 
-@router.patch("/{camera_id}", response_model=CameraWithStatus)
+@router.patch("/{camera_id}", response_model=CameraWithStatus, dependencies=[Depends(require_admin)])
 async def update_camera(
     camera_id: str,
     payload: CameraUpdate,
@@ -67,7 +67,7 @@ async def update_camera(
     return _with_status(camera, manager)
 
 
-@router.delete("/{camera_id}", status_code=204)
+@router.delete("/{camera_id}", status_code=204, dependencies=[Depends(require_admin)])
 async def delete_camera(
     camera_id: str,
     delete_recordings: bool = False,

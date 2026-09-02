@@ -16,6 +16,10 @@
 
 * { box-sizing: border-box; }
 
+/* Author rules like .btn{display:...} otherwise beat the UA default
+   [hidden] rule at equal specificity, silently un-hiding toggled elements. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   padding: 0;

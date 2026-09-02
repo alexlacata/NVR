@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from app.config import Settings
-from app.deps import get_settings, get_store, require_auth
+from app.deps import get_settings, get_store, require_admin, require_auth
 from app.recordings import RECORDING_NAME_RE, list_recording_segments
 from app.store import CameraNotFound, CameraStore
 
@@ -213,7 +213,7 @@ def get_recording(
     return FileResponse(path, media_type="video/mp4", filename=filename)
 
 
-@router.delete("/{camera_id}/recordings/{filename}", status_code=204)
+@router.delete("/{camera_id}/recordings/{filename}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_recording(
     camera_id: str,
     filename: str,

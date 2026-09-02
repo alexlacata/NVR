@@ -5,7 +5,9 @@ from pydantic import BaseModel
 
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
-from app.deps import get_auth_service, get_settings, require_auth
+from app.deps import get_auth_service, get_settings, get_user_store, require_auth
+from app.models import PasswordChange, User
+from app.user_store import UserStore, pwd_context
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -27,9 +29,10 @@ def login(
     auth_service: AuthService = Depends(get_auth_service),
     settings: Settings = Depends(get_settings),
 ):
-    if not auth_service.verify_credentials(payload.username, payload.password):
+    user = auth_service.verify_credentials(payload.username, payload.password)
+    if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Identifiants incorrects")
-    token = auth_service.create_token(payload.username)
+    token = auth_service.create_token(user.username)
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
@@ -50,5 +53,17 @@ def logout(response: Response):
 
 
 @router.get("/me")
-def me(_: str = Depends(require_auth), settings: Settings = Depends(get_settings)):
-    return {"username": settings.admin_username}
+def me(user: User = Depends(require_auth)):
+    return {"username": user.username, "role": user.role}
+
+
+@router.patch("/password")
+def change_own_password(
+    payload: PasswordChange,
+    user: User = Depends(require_auth),
+    users: UserStore = Depends(get_user_store),
+):
+    if not pwd_context.verify(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mot de passe actuel incorrect")
+    users.set_password_hash(user.username, pwd_context.hash(payload.new_password))
+    return {"ok": True}

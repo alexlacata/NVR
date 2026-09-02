@@ -189,6 +189,34 @@ vignettes ne coûtent aucune bande passante caméra supplémentaire : elles
 sont extraites localement des fichiers déjà enregistrés, jamais d'une
 connexion en direct.
 
+## Comptes utilisateurs et paramètres serveur
+
+Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
+
+- **Mon compte** : changer son propre mot de passe (tous les comptes).
+- **Utilisateurs** *(administrateurs uniquement)* : créer des comptes,
+  changer le rôle d'un compte (**Administrateur** ou **Lecteur**), supprimer
+  un compte. Un compte **Lecteur** peut regarder les caméras en direct et en
+  différé et piloter le PTZ, mais ne voit ni les boutons d'ajout/suppression
+  de caméra, ni les réglages serveur, ni la gestion des utilisateurs — et
+  l'API refuse ces actions même en cas d'appel direct (403), la restriction
+  n'est pas qu'une question d'affichage. Il est impossible de supprimer ou de
+  rétrograder le dernier compte administrateur restant, pour ne jamais se
+  retrouver sans accès admin.
+- **Paramètres serveur** *(administrateurs uniquement)* : rétention,
+  seuil d'espace disque libre, durée des fichiers d'enregistrement, réglages
+  HLS et vignettes — les mêmes réglages que les variables d'environnement
+  `NVR_*` ci-dessous, mais modifiables sans redémarrer le conteneur.
+  L'enregistrement est appliqué immédiatement et les flux caméra en cours
+  redémarrent brièvement pour prendre en compte les nouveaux réglages
+  (segments, HLS, vignettes).
+
+`NVR_ADMIN_USERNAME`/`NVR_ADMIN_PASSWORD` ne servent qu'à créer le tout
+premier compte administrateur au premier démarrage (quand aucun utilisateur
+n'existe encore) ; une fois ce compte créé, ces variables n'ont plus aucun
+effet et la gestion des comptes se fait entièrement depuis la page
+**Paramètres**.
+
 ## Regarder depuis le téléphone
 
 - **Sur le même réseau Wi-Fi** : ouvrez `http://<ip-locale-du-serveur>:8000`
@@ -246,35 +274,42 @@ caméras sur la 4G pour pouvoir enregistrer.
 | Variable | Défaut | Description |
 |---|---|---|
 | `NVR_DATA_DIR` | `data` | Dossier racine (enregistrements, config, HLS) |
-| `NVR_ADMIN_USERNAME` | `admin` | Identifiant de connexion |
-| `NVR_ADMIN_PASSWORD` | `changeme` | Mot de passe de connexion (**à changer**) |
+| `NVR_ADMIN_USERNAME` | `admin` | Identifiant du premier compte administrateur, créé **une seule fois** au tout premier démarrage (sans effet ensuite — voir *Comptes utilisateurs et paramètres serveur*) |
+| `NVR_ADMIN_PASSWORD` | `changeme` | Mot de passe du premier compte administrateur (**à changer**, idem) |
 | `NVR_SECRET_KEY` | *(généré et conservé automatiquement)* | Clé de signature des sessions |
-| `NVR_SEGMENT_SECONDS` | `600` | Durée d'un fichier d'enregistrement (secondes) |
-| `NVR_RETENTION_DAYS` | `14` | Suppression des enregistrements plus vieux que N jours |
-| `NVR_MIN_FREE_DISK_PERCENT` | `10` | Purge des plus anciens enregistrements sous ce seuil d'espace libre |
-| `NVR_HLS_SEGMENT_SECONDS` | `2` | Taille des segments HLS (latence du direct) |
-| `NVR_HLS_LIST_SIZE` | `6` | Nombre de segments HLS conservés dans la playlist (marge sur liaison instable) |
-| `NVR_THUMBNAIL_INTERVAL_SECONDS` | `60` | Intervalle par défaut entre deux vignettes (secondes), surchargeable par caméra |
-| `NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS` | `30` | Fréquence de vérification des nouveaux enregistrements à traiter |
+| `NVR_SEGMENT_SECONDS` | `600` | Durée d'un fichier d'enregistrement (secondes) — modifiable aussi depuis **Paramètres** |
+| `NVR_RETENTION_DAYS` | `14` | Suppression des enregistrements plus vieux que N jours — idem |
+| `NVR_MIN_FREE_DISK_PERCENT` | `10` | Purge des plus anciens enregistrements sous ce seuil d'espace libre — idem |
+| `NVR_HLS_SEGMENT_SECONDS` | `2` | Taille des segments HLS (latence du direct) — idem |
+| `NVR_HLS_LIST_SIZE` | `6` | Nombre de segments HLS conservés dans la playlist (marge sur liaison instable) — idem |
+| `NVR_THUMBNAIL_INTERVAL_SECONDS` | `60` | Intervalle par défaut entre deux vignettes (secondes), surchargeable par caméra — idem |
+| `NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS` | `30` | Fréquence de vérification des nouveaux enregistrements à traiter — idem |
 | `NVR_PORT` | `8000` | Port d'écoute |
+
+Les lignes marquées « idem » ci-dessus ne fixent qu'une valeur de démarrage :
+un administrateur peut les changer à tout moment depuis **Paramètres → 
+Paramètres serveur** dans l'interface, sans redémarrer le conteneur.
 
 ## Structure du dépôt
 
 ```
 app/
-  config.py          configuration (variables d'environnement)
-  models.py           modèles de données (Camera, ...)
+  config.py          configuration (variables d'environnement + surcharges runtime)
+  models.py           modèles de données (Camera, User, réglages runtime, ...)
   store.py            persistance des caméras (YAML)
+  user_store.py         persistance des comptes utilisateurs (YAML, mots de passe hachés)
+  settings_store.py      persistance des réglages serveur modifiables depuis l'UI (YAML)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
   retention.py         purge automatique des enregistrements et vignettes
   recordings.py         nommage/parcours des segments enregistrés (partagé)
   thumbnails.py          extraction des vignettes depuis les segments termines
-  auth.py              authentification par session
+  auth.py              authentification par session + comptes (bootstrap, vérification)
+  deps.py                dépendances FastAPI (require_auth, require_admin)
   onvif_client.py        client ONVIF (PTZ + decouverte des flux media)
   onvif_discovery.py      recherche de cameras ONVIF sur le reseau (WS-Discovery)
   ptz_registry.py        cache des clients PTZ par caméra
-  api/                 routes FastAPI (auth, caméras, médias, PTZ, ONVIF, système)
+  api/                 routes FastAPI (auth, utilisateurs, paramètres, caméras, médias, PTZ, ONVIF, système)
   static/              interface web (HTML/CSS/JS, sans build)
 tests/                 tests automatisés (pytest)
 ```
