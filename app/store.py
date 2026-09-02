@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import threading
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -15,7 +16,12 @@ _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
 def slugify(name: str) -> str:
-    slug = _SLUG_RE.sub("-", name.lower()).strip("-")
+    # Strip accents ("Caméra Entrée" -> "Camera Entree") before collapsing
+    # non-alphanumerics, otherwise every accented letter becomes its own
+    # separator and French camera names turn into unreadable ids like
+    # "cam-ra-entr-e" instead of "camera-entree".
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    slug = _SLUG_RE.sub("-", ascii_name.lower()).strip("-")
     return slug or uuid.uuid4().hex[:8]
 
 

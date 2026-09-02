@@ -176,7 +176,8 @@ function openAddModal() {
   }}, [
     el("div", {}, [el("label", {}, "Nom"), nameInput]),
     el("div", {}, [el("label", {}, "Type de source"), typeSelect]),
-    el("div", {}, [el("label", {}, "URL du flux principal (enregistrement)"), urlInput]),
+    el("div", {}, [el("label", {}, "URL du flux principal (enregistrement)"), urlInput,
+      el("div", { class: "hint" }, "Une simple adresse IP (ex. 192.168.1.50 ou 192.168.1.50:554/stream1) suffit, rtsp:// est ajoute automatiquement.")]),
     el("div", {}, [el("label", {}, "URL du flux secondaire (direct, optionnel)"), liveUrlInput,
       el("div", { class: "hint" }, "Laisser vide pour utiliser le meme flux en direct et pour l'enregistrement.")]),
     el("div", { class: "checkbox-row" }, [recordCheckbox, el("label", {}, "Enregistrer en continu sur le disque")]),

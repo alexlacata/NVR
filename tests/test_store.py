@@ -1,7 +1,7 @@
 import pytest
 
 from app.models import CameraCreate, CameraUpdate, SourceType
-from app.store import CameraNotFound, CameraStore
+from app.store import CameraNotFound, CameraStore, slugify
 
 
 @pytest.fixture()
@@ -47,6 +47,19 @@ def test_get_missing_raises(store):
 def test_invalid_rtsp_url_rejected(store):
     with pytest.raises(Exception):
         store.create(CameraCreate(name="Bad", source_type=SourceType.rtsp, url="http://not-rtsp"))
+
+
+def test_slugify_strips_accents_instead_of_mangling_them():
+    # Accented characters used to each become their own "-" separator
+    # ("Camera Entree" -> "cam-ra-entr-e"); they should be transliterated
+    # to plain ASCII first so French names stay readable.
+    assert slugify("Caméra Entrée") == "camera-entree"
+    assert slugify("Garage arrière") == "garage-arriere"
+
+
+def test_create_with_accented_name_gets_readable_id(store):
+    cam = store.create(CameraCreate(name="Caméra Entrée", source_type=SourceType.rtsp, url="rtsp://cam1/1"))
+    assert cam.id == "camera-entree"
 
 
 def test_persists_across_instances(tmp_path):

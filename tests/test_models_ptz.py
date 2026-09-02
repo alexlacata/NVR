@@ -53,3 +53,23 @@ def test_srt_url_must_start_with_srt_scheme():
         Camera(**_base(source_type=SourceType.srt, url="rtsp://x/1"))
     cam = Camera(**_base(source_type=SourceType.srt, url="srt://x:9000"))
     assert cam.url == "srt://x:9000"
+
+
+def test_bare_ip_gets_default_scheme_for_source_type():
+    # Adding a camera "by IP" without knowing to type a URL scheme should
+    # just work, not be rejected.
+    cam = Camera(**_base(source_type=SourceType.rtsp, url="192.168.1.50"))
+    assert cam.url == "rtsp://192.168.1.50"
+
+    cam2 = Camera(**_base(source_type=SourceType.rtsp, url="192.168.1.50:554/stream1"))
+    assert cam2.url == "rtsp://192.168.1.50:554/stream1"
+
+    cam3 = Camera(**_base(source_type=SourceType.http, url="192.168.1.50/video"))
+    assert cam3.url == "http://192.168.1.50/video"
+
+
+def test_bare_ip_does_not_bypass_scheme_mismatch():
+    # A URL that already has *some* scheme is still validated for real -
+    # only a fully scheme-less value gets a default prepended.
+    with pytest.raises(ValidationError):
+        Camera(**_base(source_type=SourceType.rtsp, url="http://192.168.1.50/video"))

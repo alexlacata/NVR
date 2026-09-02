@@ -71,6 +71,12 @@ class CameraBase(BaseModel):
             SourceType.srt: ("srt://",),
             SourceType.http: ("http://", "https://"),
         }.get(source_type)
+        if required_scheme and "://" not in v:
+            # Bare IP/host ("192.168.1.50" or "192.168.1.50:554/stream1"),
+            # the common case when adding a camera "by IP" without knowing
+            # to type a URL scheme - assume the scheme for this source type
+            # instead of rejecting it.
+            v = required_scheme[0] + v
         if required_scheme and not v.startswith(required_scheme):
             raise ValueError(f"L'URL doit commencer par {' ou '.join(required_scheme)}")
         return v
