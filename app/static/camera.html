@@ -672,7 +672,11 @@ async function loadTimeline(date) {
   }
 
   if (thumbnails.length === 0) {
-    strip.appendChild(el("div", { class: "hint" }, "Aucune vignette pour cette date pour l'instant (generees a partir des enregistrements termines)."));
+    // Not .hint - that class carries a negative top margin meant to pull
+    // it up against a form label right above it, which instead crowds it
+    // against the timeline ticks row here. .timeline-empty is the same
+    // empty-state style already used for "no recordings" right above.
+    strip.appendChild(el("div", { class: "timeline-empty" }, "Aucune vignette pour cette date pour l'instant (generees a partir des enregistrements termines)."));
   } else {
     thumbnails.forEach((t) => {
       strip.appendChild(el("button", { type: "button", class: "thumb-item", onclick: () => seekToTime(date, t.time) }, [

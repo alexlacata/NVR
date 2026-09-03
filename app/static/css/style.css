@@ -70,6 +70,14 @@ a { color: var(--accent); text-decoration: none; }
 
 .topbar .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
+/* On narrow screens the action buttons can outgrow the title's row and
+   wrap onto their own line - let that line span the full width so the
+   wrapped buttons start flush with the title above instead of sitting
+   wherever the (right-aligned) actions block happened to end up. */
+@media (max-width: 480px) {
+  .topbar .actions { width: 100%; }
+}
+
 .container { padding: 16px; max-width: 1200px; margin: 0 auto; }
 
 .btn {
