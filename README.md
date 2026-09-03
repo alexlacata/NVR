@@ -2,7 +2,8 @@
 
 Un enregistreur vidéo réseau (NVR) auto-hébergé : il ingère plusieurs flux
 vidéo (RTSP, RTMP, SRT, HTTP/MJPEG, caméra USB) de n'importe quelle marque
-compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, ...), les
+compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest,
+Annke, EZVIZ, Foscam, TP-Link Tapo, Vivotek, Wyze, ...), les
 enregistre en continu sur un disque dur, et sert de passerelle pour les
 regarder en direct ou en différé depuis un téléphone ou un ordinateur, via
 un navigateur web.
@@ -35,7 +36,9 @@ un navigateur web.
 - **Multi-protocole et multi-marque** : RTSP, RTMP, SRT, HTTP/MJPEG, USB.
   Détection automatique du flux via ONVIF (Hikvision, Uniview, Dahua, Axis,
   Reolink et toute caméra compatible), avec recherche sur le réseau local ou
-  assistant de configuration par marque en secours.
+  assistant de configuration par marque en secours (Hikvision, Uniview,
+  Dahua, Axis, Reolink, Amcrest, Annke, EZVIZ, Foscam, TP-Link Tapo,
+  Vivotek, Wyze).
 
 ## Architecture en bref
 
@@ -234,11 +237,15 @@ Dans le formulaire d'ajout (et sur la page de chaque caméra), dépliez
   l'avance — voir la note Docker ci-dessous pour que cela fonctionne en
   conteneur.
 - **Assistant par marque** : si la caméra n'a pas ONVIF activé, choisissez
-  sa marque (Hikvision, Uniview, Dahua, Axis, Reolink), renseignez
-  IP/port/identifiants/canal, et l'URL RTSP est composée automatiquement
-  selon le schéma habituel de cette marque. Ces schémas sont les plus
-  courants mais peuvent varier selon le modèle/firmware — préférez la
-  détection ONVIF quand c'est possible.
+  sa marque (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest, Annke,
+  EZVIZ, Foscam, TP-Link Tapo, Vivotek, Wyze avec firmware RTSP),
+  renseignez IP/port/identifiants/canal, et l'URL RTSP est composée
+  automatiquement selon le schéma habituel de cette marque. Ces schémas
+  sont les plus courants mais peuvent varier selon le modèle/firmware —
+  préférez la détection ONVIF quand c'est possible. Notez que certaines
+  marques exigent d'abord d'activer le flux RTSP dans leur appli mobile
+  (EZVIZ, TP-Link Tapo) ou d'installer un firmware alternatif (Wyze) —
+  un rappel s'affiche dans l'assistant pour ces cas.
 
 Le PTZ et la limite de bande passante du direct se configurent ensuite sur
 la page de la caméra (section *Bande passante du direct* et *PTZ*).

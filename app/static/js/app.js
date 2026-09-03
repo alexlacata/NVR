@@ -146,6 +146,48 @@ const CAMERA_BRANDS = {
     hint: "Chemin standard Reolink.",
     build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/h264Preview_${String(v.channel).padStart(2, "0")}_${v.sub ? "sub" : "main"}`,
   },
+  amcrest: {
+    label: "Amcrest",
+    defaultPort: 554,
+    hint: "Amcrest utilise la technologie Dahua : meme chemin (subtype 0=principal, 1=secondaire).",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/cam/realmonitor?channel=${v.channel}&subtype=${v.sub ? "1" : "0"}`,
+  },
+  annke: {
+    label: "Annke",
+    defaultPort: 554,
+    hint: "La plupart des cameras Annke utilisent un chemin compatible Hikvision.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/Streaming/Channels/${v.channel}0${v.sub ? "2" : "1"}`,
+  },
+  ezviz: {
+    label: "EZVIZ",
+    defaultPort: 554,
+    hint: "Chemin standard EZVIZ. Le flux RTSP doit d'abord etre active dans l'app EZVIZ (Parametres cameras > Confidentialite > Chiffrement video, ou Fonctions locales > RTSP selon le modele).",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/h264/ch${v.channel}/${v.sub ? "sub" : "main"}/av_stream`,
+  },
+  foscam: {
+    label: "Foscam",
+    defaultPort: 554,
+    hint: "Chemin standard Foscam.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/${v.sub ? "videoSub" : "videoMain"}`,
+  },
+  tapo: {
+    label: "TP-Link Tapo",
+    defaultPort: 554,
+    hint: "Activez d'abord le flux RTSP dans l'app Tapo (Parametres camera > Avance > Compte camera), qui fournit un identifiant/mot de passe RTSP dedie (different du compte Tapo).",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/stream${v.sub ? "2" : "1"}`,
+  },
+  vivotek: {
+    label: "Vivotek",
+    defaultPort: 554,
+    hint: "Chemin standard Vivotek.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/live.sdp`,
+  },
+  wyze: {
+    label: "Wyze (firmware RTSP)",
+    defaultPort: 554,
+    hint: "Necessite d'installer le firmware RTSP officiel Wyze (Wyze Cam v2/v3/Pan) au prealable - le firmware d'origine ne propose pas de RTSP.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/live`,
+  },
 };
 
 // A brand + fields helper that builds a ready-to-use RTSP URL. These are
@@ -287,7 +329,7 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
 
   return el("div", { class: "card field-grid" }, [
     el("div", { class: "section-title", style: "margin:0" }, "Detection ONVIF"),
-    el("div", { class: "hint", style: "margin-bottom:8px" }, "Fonctionne avec toute camera compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, ...) - interroge la camera directement plutot que de deviner l'URL."),
+    el("div", { class: "hint", style: "margin-bottom:8px" }, "Fonctionne avec toute camera compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest, Annke, Vivotek, ...) - interroge la camera directement plutot que de deviner l'URL."),
     el("div", {}, [ el("label", {}, "URL du service ONVIF"), urlInput ]),
     el("div", { class: "row" }, [
       el("div", {}, [ el("label", {}, "Utilisateur"), userInput ]),
