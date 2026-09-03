@@ -177,20 +177,23 @@ exactement comme une carte SD, et le Pi 4/5 peut démarrer directement dessus.
    ```bash
    ssh <utilisateur>@<ip-du-pi>
    ```
-3. **Lancer le script de provisionnement**, qui installe Docker, clone ce
-   dépôt, crée `.env` (avec une clé secrète générée automatiquement),
-   prépare le point de montage du disque d'enregistrement, et active un
-   service systemd pour que le NVR redémarre automatiquement avec le
-   système :
+3. **Lancer le script de provisionnement** — une seule commande à copier-coller,
+   aucun paramètre à renseigner :
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/pi-image/firstboot.sh \
-     | bash -s -- https://github.com/<owner>/<repo>.git
+   curl -fsSL https://raw.githubusercontent.com/alexlacata/NVR/claude/nvr-multi-stream-gateway-fzb8xm/pi-image/firstboot.sh | bash
    ```
-   (remplacez `<owner>/<repo>` par ce dépôt). Le script affiche à la fin
-   l'adresse `http://<ip-du-pi>:8000` de l'interface. Pensez ensuite à
-   changer `NVR_ADMIN_PASSWORD` dans `~/nvr/.env` puis à relancer
-   `docker compose up -d` (ou simplement re-exécuter le script, il est
-   conçu pour être relancé sans risque après un `git pull`).
+   Il affiche sa progression étape par étape (installation de Docker,
+   récupération du logiciel, configuration, disque, démarrage automatique)
+   et installe Docker, clone ce dépôt, crée `.env` (avec une clé secrète
+   générée automatiquement), prépare le point de montage du disque
+   d'enregistrement, et active un service systemd pour que le NVR
+   redémarre automatiquement avec le système. À la fin, il affiche
+   clairement l'adresse `http://<ip-du-pi>:8000` de l'interface et un
+   rappel bien visible pour changer le mot de passe administrateur par
+   défaut (uniquement à la toute première installation).
+   Relancer exactement la même commande à tout moment est sans risque
+   (le script est conçu pour être ré-exécuté — il détecte ce qui est
+   déjà en place et met simplement à jour le reste).
    Le script est aussi disponible dans ce dépôt sous `pi-image/firstboot.sh`
    si vous préférez cloner puis l'exécuter localement (`bash
    pi-image/firstboot.sh`).
