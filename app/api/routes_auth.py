@@ -68,6 +68,11 @@ def change_own_password(
     users: UserStore = Depends(get_user_store),
 ):
     if not pwd_context.verify(payload.current_password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mot de passe actuel incorrect")
+        # 403, not 401: the session itself is valid (require_auth already
+        # passed) - only the submitted current-password check failed. The
+        # frontend's generic api() helper treats any 401 as "session
+        # expired" and redirects straight to the login page, which would
+        # silently wipe this error out instead of showing it in the form.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mot de passe actuel incorrect")
     users.set_password_hash(user.username, pwd_context.hash(payload.new_password))
     return {"ok": True}

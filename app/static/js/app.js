@@ -16,12 +16,28 @@ async function api(path, options = {}) {
   return resp;
 }
 
+// FastAPI's validation errors (422) put `detail` as a list of
+// {loc, msg, ...} objects rather than a string - shown as-is that's a wall
+// of raw JSON, so pull out just the field name and message.
+function formatErrorDetail(detail) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e) => {
+        const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : null;
+        return field && e.msg ? `${field} : ${e.msg}` : (e.msg || JSON.stringify(e));
+      })
+      .join(" · ");
+  }
+  return JSON.stringify(detail);
+}
+
 async function apiJson(path, options = {}) {
   const resp = await api(path, options);
   const data = await resp.json().catch(() => null);
   if (!resp.ok) {
     const detail = (data && data.detail) || `Erreur ${resp.status}`;
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    throw new Error(formatErrorDetail(detail));
   }
   return data;
 }

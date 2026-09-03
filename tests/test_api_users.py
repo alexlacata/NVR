@@ -156,7 +156,11 @@ async def test_self_password_change_wrong_current_rejected(client):
     resp = await client.patch("/api/auth/password", json={
         "current_password": "wrong-password", "new_password": "brandnewpass1",
     })
-    assert resp.status_code == 401
+    # 403, not 401: the session is still valid, only the submitted current
+    # password was wrong. A 401 here would make the frontend's generic
+    # "401 -> redirect to login" handling swallow this error silently
+    # instead of showing it in the password-change form.
+    assert resp.status_code == 403
 
 
 @pytest.mark.asyncio
