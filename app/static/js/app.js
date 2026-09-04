@@ -204,6 +204,66 @@ const CAMERA_BRANDS = {
     hint: "Necessite d'installer le firmware RTSP officiel Wyze (Wyze Cam v2/v3/Pan) au prealable - le firmware d'origine ne propose pas de RTSP.",
     build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/live`,
   },
+  lorex: {
+    label: "Lorex",
+    defaultPort: 554,
+    hint: "Lorex utilise la technologie Dahua : meme chemin (subtype 0=principal, 1=secondaire).",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/cam/realmonitor?channel=${v.channel}&subtype=${v.sub ? "1" : "0"}`,
+  },
+  swann: {
+    label: "Swann",
+    defaultPort: 554,
+    hint: "Swann utilise la technologie Hikvision/Dahua selon le modele - essayez ce chemin, sinon la detection ONVIF ci-dessous.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/cam/realmonitor?channel=${v.channel}&subtype=${v.sub ? "1" : "0"}`,
+  },
+  nightowl: {
+    label: "Night Owl",
+    defaultPort: 554,
+    hint: "Night Owl utilise generalement la technologie Dahua (subtype 0=principal, 1=secondaire).",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/cam/realmonitor?channel=${v.channel}&subtype=${v.sub ? "1" : "0"}`,
+  },
+  lts: {
+    label: "LTS / Loryta",
+    defaultPort: 554,
+    hint: "LTS/Loryta (OEM Hikvision) utilise le meme chemin que Hikvision.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/Streaming/Channels/${v.channel}0${v.sub ? "2" : "1"}`,
+  },
+  hanwha: {
+    label: "Hanwha / Samsung Wisenet",
+    defaultPort: 554,
+    hint: "Chemin standard Hanwha Techwin (Wisenet).",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/profile${v.sub ? "2" : "1"}/media.smp`,
+  },
+  bosch: {
+    label: "Bosch",
+    defaultPort: 554,
+    hint: "Chemin standard Bosch (canal RCP over RTSP).",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/rtsp_tunnel`,
+  },
+  panasonic: {
+    label: "Panasonic",
+    defaultPort: 554,
+    hint: "Chemin standard Panasonic i-PRO.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/MediaInput/${v.sub ? "h264/stream_2" : "h264/stream_1"}`,
+  },
+  geovision: {
+    label: "Geovision",
+    defaultPort: 554,
+    hint: "Chemin standard Geovision.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/CH${String(v.channel).padStart(3, "0")}.sdp`,
+  },
+  unifiprotect: {
+    label: "Ubiquiti UniFi Protect",
+    defaultPort: 7447,
+    hint: "Activez d'abord le flux RTSP(S) pour la camera dans l'appli UniFi Protect (Paramametres camera > Avance > Flux RTSP) - elle fournit alors l'URL complete avec un alias a copier telle quelle plutot qu'a reconstruire ici.",
+    build: (v) => `rtsp://${v.host}:${v.port}/<alias-fourni-par-unifi-protect>`,
+  },
+  generic: {
+    label: "Generique / autre marque (NVR/DVR sans nom)",
+    defaultPort: 554,
+    hint: "Beaucoup de NVR/DVR generiques (souvent des clones Dahua ou Hikvision) repondent a l'un de ces deux chemins - essayez celui-ci en premier, sinon changez de marque ci-dessus ou utilisez la detection ONVIF.",
+    build: (v) => `rtsp://${v.user}:${v.pass}@${v.host}:${v.port}/cam/realmonitor?channel=${v.channel}&subtype=${v.sub ? "1" : "0"}`,
+  },
 };
 
 // A brand + fields helper that builds a ready-to-use RTSP URL. These are
@@ -345,7 +405,7 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
 
   return el("div", { class: "card field-grid" }, [
     el("div", { class: "section-title", style: "margin:0" }, "Detection ONVIF"),
-    el("div", { class: "hint", style: "margin-bottom:8px" }, "Fonctionne avec toute camera compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest, Annke, Vivotek, ...) - interroge la camera directement plutot que de deviner l'URL."),
+    el("div", { class: "hint", style: "margin-bottom:8px" }, "Fonctionne avec toute camera compatible ONVIF, quelle que soit la marque (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest, Annke, Vivotek, Lorex, Swann, Hanwha, Bosch, Panasonic, ...) - interroge la camera directement plutot que de deviner l'URL."),
     el("div", {}, [ el("label", {}, "URL du service ONVIF"), urlInput ]),
     el("div", { class: "row" }, [
       el("div", {}, [ el("label", {}, "Utilisateur"), userInput ]),

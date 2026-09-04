@@ -3,7 +3,9 @@
 Un enregistreur vidéo réseau (NVR) auto-hébergé : il ingère plusieurs flux
 vidéo (RTSP, RTMP, SRT, HTTP/MJPEG, caméra USB) de n'importe quelle marque
 compatible ONVIF (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest,
-Annke, EZVIZ, Foscam, TP-Link Tapo, Vivotek, Wyze, ...), les
+Annke, EZVIZ, Foscam, TP-Link Tapo, Vivotek, Wyze, Lorex, Swann, Night Owl,
+LTS/Loryta, Hanwha/Wisenet, Bosch, Panasonic, Geovision, Ubiquiti UniFi
+Protect, et tout NVR/DVR générique compatible RTSP, ...), les
 enregistre en continu sur un disque dur, et sert de passerelle pour les
 regarder en direct ou en différé depuis un téléphone ou un ordinateur, via
 un navigateur web.
@@ -38,7 +40,9 @@ un navigateur web.
   Reolink et toute caméra compatible), avec recherche sur le réseau local ou
   assistant de configuration par marque en secours (Hikvision, Uniview,
   Dahua, Axis, Reolink, Amcrest, Annke, EZVIZ, Foscam, TP-Link Tapo,
-  Vivotek, Wyze).
+  Vivotek, Wyze, Lorex, Swann, Night Owl, LTS/Loryta, Hanwha/Wisenet,
+  Bosch, Panasonic, Geovision, Ubiquiti UniFi Protect, ou un profil
+  générique pour les NVR/DVR sans marque reconnue).
 
 ## Architecture en bref
 
@@ -241,14 +245,18 @@ Dans le formulaire d'ajout (et sur la page de chaque caméra), dépliez
   conteneur.
 - **Assistant par marque** : si la caméra n'a pas ONVIF activé, choisissez
   sa marque (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest, Annke,
-  EZVIZ, Foscam, TP-Link Tapo, Vivotek, Wyze avec firmware RTSP),
-  renseignez IP/port/identifiants/canal, et l'URL RTSP est composée
-  automatiquement selon le schéma habituel de cette marque. Ces schémas
-  sont les plus courants mais peuvent varier selon le modèle/firmware —
-  préférez la détection ONVIF quand c'est possible. Notez que certaines
-  marques exigent d'abord d'activer le flux RTSP dans leur appli mobile
-  (EZVIZ, TP-Link Tapo) ou d'installer un firmware alternatif (Wyze) —
-  un rappel s'affiche dans l'assistant pour ces cas.
+  EZVIZ, Foscam, TP-Link Tapo, Vivotek, Wyze avec firmware RTSP, Lorex,
+  Swann, Night Owl, LTS/Loryta, Hanwha/Wisenet, Bosch, Panasonic,
+  Geovision, Ubiquiti UniFi Protect, ou un profil **Générique / autre
+  marque** pour les NVR/DVR sans nom reconnu — souvent des clones Dahua ou
+  Hikvision), renseignez IP/port/identifiants/canal, et l'URL RTSP est
+  composée automatiquement selon le schéma habituel de cette marque. Ces
+  schémas sont les plus courants mais peuvent varier selon le
+  modèle/firmware — préférez la détection ONVIF quand c'est possible.
+  Notez que certaines marques exigent d'abord d'activer le flux RTSP dans
+  leur appli mobile (EZVIZ, TP-Link Tapo, Ubiquiti UniFi Protect) ou
+  d'installer un firmware alternatif (Wyze) — un rappel s'affiche dans
+  l'assistant pour ces cas.
 
 Le PTZ et la limite de bande passante du direct se configurent ensuite sur
 la page de la caméra (section *Bande passante du direct* et *PTZ*).
