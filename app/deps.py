@@ -5,6 +5,7 @@ from fastapi import HTTPException, Request, status
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
 from app.ffmpeg_manager import StreamManager
+from app.login_throttle import LoginThrottle
 from app.models import Permission, User, UserRole, has_permission
 from app.motion import MotionRegistry
 from app.ptz_registry import PTZRegistry
@@ -48,6 +49,10 @@ def get_settings_store(request: Request) -> SettingsStore:
 
 def get_systems_store(request: Request) -> RemoteSystemStore:
     return request.app.state.systems_store
+
+
+def get_login_throttle(request: Request) -> LoginThrottle:
+    return request.app.state.login_throttle
 
 
 def require_auth(request: Request) -> User:

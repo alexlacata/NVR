@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     secret_key: str = ""  # auto-generated and persisted if left blank
     session_max_age_seconds: int = 60 * 60 * 24 * 30  # 30 days
 
+    # Login anti-bruteforce: after login_max_attempts failed logins for the
+    # same username within login_attempt_window_seconds, that username is
+    # locked out for login_lockout_seconds.
+    login_max_attempts: int = 5
+    login_attempt_window_seconds: int = 300
+    login_lockout_seconds: int = 300
+
     # Recording / retention
     segment_seconds: int = 600  # length of each recorded file (10 min)
     retention_days: int = 14  # delete recordings older than this

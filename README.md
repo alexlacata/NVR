@@ -401,6 +401,14 @@ n'existe encore) ; une fois ce compte créé, ces variables n'ont plus aucun
 effet et la gestion des comptes se fait entièrement depuis la page
 **Paramètres**.
 
+**Protection anti-bruteforce** : après 5 échecs de connexion consécutifs sur
+un même compte (en 5 minutes), ce compte est bloqué 5 minutes avant de
+pouvoir retenter — même avec le bon mot de passe. Réglable via
+`NVR_LOGIN_MAX_ATTEMPTS`/`NVR_LOGIN_ATTEMPT_WINDOW_SECONDS`/
+`NVR_LOGIN_LOCKOUT_SECONDS`. Le blocage est par compte (pas par IP) : deux
+appareils derrière la même IP partagée (4G, routeur familial) ne se
+bloquent pas mutuellement.
+
 ## Regarder depuis le téléphone
 
 - **Sur le même réseau Wi-Fi** : ouvrez `http://<ip-locale-du-serveur>:8000`
@@ -547,6 +555,9 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_ADMIN_USERNAME` | `admin` | Identifiant du premier compte administrateur, créé **une seule fois** au tout premier démarrage (sans effet ensuite — voir *Comptes utilisateurs et paramètres serveur*) |
 | `NVR_ADMIN_PASSWORD` | `changeme` | Mot de passe du premier compte administrateur (**à changer**, idem) |
 | `NVR_SECRET_KEY` | *(généré et conservé automatiquement)* | Clé de signature des sessions |
+| `NVR_LOGIN_MAX_ATTEMPTS` | `5` | Nombre d'échecs de connexion tolérés pour un même compte avant blocage temporaire (anti-bruteforce) |
+| `NVR_LOGIN_ATTEMPT_WINDOW_SECONDS` | `300` | Fenêtre de temps sur laquelle les échecs sont comptés |
+| `NVR_LOGIN_LOCKOUT_SECONDS` | `300` | Durée du blocage une fois le seuil atteint |
 | `NVR_SEGMENT_SECONDS` | `600` | Durée d'un fichier d'enregistrement (secondes) — modifiable aussi depuis **Paramètres** |
 | `NVR_RETENTION_DAYS` | `14` | Suppression des enregistrements plus vieux que N jours — idem |
 | `NVR_MIN_FREE_DISK_PERCENT` | `10` | Purge des plus anciens enregistrements sous ce seuil d'espace libre — idem |

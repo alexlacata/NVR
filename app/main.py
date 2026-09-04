@@ -23,6 +23,7 @@ from app.api import (
 from app.auth import AuthService, bootstrap_admin
 from app.config import get_settings
 from app.ffmpeg_manager import StreamManager
+from app.login_throttle import LoginThrottle
 from app.motion import MotionRegistry, motion_loop
 from app.ptz_registry import PTZRegistry
 from app.recording_schedule import recording_schedule_loop
@@ -52,6 +53,11 @@ async def lifespan(app: FastAPI):
     app.state.user_store = UserStore(settings.users_file)
     bootstrap_admin(settings, app.state.user_store)
     app.state.auth_service = AuthService(settings, app.state.user_store)
+    app.state.login_throttle = LoginThrottle(
+        max_attempts=settings.login_max_attempts,
+        window_seconds=settings.login_attempt_window_seconds,
+        lockout_seconds=settings.login_lockout_seconds,
+    )
     app.state.stream_manager = StreamManager(settings)
     app.state.ptz_registry = PTZRegistry()
     app.state.motion_registry = MotionRegistry(settings.motion_dir)

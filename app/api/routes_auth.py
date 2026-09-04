@@ -5,7 +5,8 @@ from pydantic import BaseModel
 
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
-from app.deps import get_auth_service, get_settings, get_user_store, require_auth
+from app.deps import get_auth_service, get_login_throttle, get_settings, get_user_store, require_auth
+from app.login_throttle import LoginThrottle
 from app.models import PasswordChange, User, effective_permissions
 from app.user_store import UserStore, pwd_context
 
@@ -28,10 +29,20 @@ def login(
     response: Response,
     auth_service: AuthService = Depends(get_auth_service),
     settings: Settings = Depends(get_settings),
+    throttle: LoginThrottle = Depends(get_login_throttle),
 ):
+    wait = throttle.seconds_until_unlocked(payload.username)
+    if wait > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Trop de tentatives - reessayez dans {int(wait) + 1} secondes",
+            headers={"Retry-After": str(int(wait) + 1)},
+        )
     user = auth_service.verify_credentials(payload.username, payload.password)
     if user is None:
+        throttle.record_failure(payload.username)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Identifiants incorrects")
+    throttle.record_success(payload.username)
     token = auth_service.create_token(user.username)
     response.set_cookie(
         key=COOKIE_NAME,
