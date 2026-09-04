@@ -81,6 +81,15 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # Native HTTPS (optional): when both are set, `python -m app.main`
+    # serves TLS directly instead of plain HTTP - handy for a standalone
+    # box with no reverse proxy in front of it. Leave blank (the default)
+    # to serve plain HTTP, e.g. behind Tailscale/WireGuard or a reverse
+    # proxy that terminates TLS itself (Caddy/Nginx + Let's Encrypt) - see
+    # scripts/generate-self-signed-cert.sh for a quick self-signed pair.
+    ssl_certfile: str = ""
+    ssl_keyfile: str = ""
+
     ffmpeg_binary: str = "ffmpeg"
     ffprobe_binary: str = "ffprobe"
 

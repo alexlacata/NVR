@@ -129,3 +129,24 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+def run_server() -> None:
+    """Entry point for `python -m app.main` - unlike the plain `uvicorn
+    app.main:app` CLI invocation, this reads NVR_SSL_CERTFILE/
+    NVR_SSL_KEYFILE and serves native HTTPS when both are set (see
+    Settings.ssl_certfile/ssl_keyfile)."""
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        ssl_certfile=settings.ssl_certfile or None,
+        ssl_keyfile=settings.ssl_keyfile or None,
+    )
+
+
+if __name__ == "__main__":
+    run_server()

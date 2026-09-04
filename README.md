@@ -440,6 +440,30 @@ pouvoir retenter — même avec le bon mot de passe. Réglable via
 appareils derrière la même IP partagée (4G, routeur familial) ne se
 bloquent pas mutuellement.
 
+## HTTPS
+
+Par défaut, le serveur ne parle que HTTP en clair - mots de passe et flux
+vidéo circulent alors sans chiffrement sur le réseau. Deux façons de passer
+en HTTPS, selon votre situation :
+
+- **Reverse proxy (recommandé si vous avez un vrai nom de domaine)** :
+  placez [Caddy](https://caddyserver.com/) ou Nginx + Let's Encrypt devant
+  le NVR - c'est ce qui donne un certificat public reconnu par tous les
+  navigateurs sans avertissement.
+- **HTTPS natif (pratique pour un boîtier autonome sans domaine)** :
+  générez un certificat auto-signé avec
+  `./scripts/generate-self-signed-cert.sh`, renseignez
+  `NVR_SSL_CERTFILE`/`NVR_SSL_KEYFILE` (le script affiche les valeurs à
+  copier), puis lancez le serveur avec `python -m app.main` au lieu de
+  `uvicorn app.main:app ...` (l'image Docker le fait déjà). Le navigateur
+  affichera un avertissement "connexion non privée" à accepter une fois
+  (certificat auto-signé, non reconnu par une autorité publique) - c'est
+  attendu, le trafic est bien chiffré malgré l'avertissement.
+
+Sur un réseau local/VPN (Tailscale, WireGuard) déjà chiffré de bout en
+bout, HTTP simple reste raisonnable ; ces deux options s'adressent surtout
+à un accès direct depuis Internet.
+
 ## Regarder depuis le téléphone
 
 - **Sur le même réseau Wi-Fi** : ouvrez `http://<ip-locale-du-serveur>:8000`
@@ -598,6 +622,7 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS` | `30` | Fréquence de vérification des nouveaux enregistrements à traiter — idem |
 | `NVR_MOTION_CHECK_INTERVAL_SECONDS` | `5` | Fréquence d'échantillonnage pour la détection de mouvement (caméras avec `motion_enabled`) — idem |
 | `NVR_PORT` | `8000` | Port d'écoute |
+| `NVR_SSL_CERTFILE` / `NVR_SSL_KEYFILE` | *(vide, HTTP)* | Chemins vers un certificat/clé TLS - lancez alors avec `python -m app.main` pour du HTTPS natif (voir *HTTPS* ci-dessus) |
 
 Les lignes marquées « idem » ci-dessus ne fixent qu'une valeur de démarrage :
 un administrateur peut les changer à tout moment depuis **Paramètres → 
