@@ -10,6 +10,7 @@ from app.motion import MotionRegistry
 from app.ptz_registry import PTZRegistry
 from app.settings_store import SettingsStore
 from app.store import CameraStore
+from app.systems_store import RemoteSystemStore
 from app.user_store import UserStore
 
 
@@ -43,6 +44,10 @@ def get_motion_registry(request: Request) -> MotionRegistry:
 
 def get_settings_store(request: Request) -> SettingsStore:
     return request.app.state.settings_store
+
+
+def get_systems_store(request: Request) -> RemoteSystemStore:
+    return request.app.state.systems_store
 
 
 def require_auth(request: Request) -> User:

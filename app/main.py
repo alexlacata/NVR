@@ -17,6 +17,7 @@ from app.api import (
     routes_ptz,
     routes_settings,
     routes_system,
+    routes_systems,
     routes_users,
 )
 from app.auth import AuthService, bootstrap_admin
@@ -28,6 +29,7 @@ from app.recording_schedule import recording_schedule_loop
 from app.retention import retention_loop
 from app.settings_store import SettingsStore
 from app.store import CameraStore
+from app.systems_store import RemoteSystemStore
 from app.thumbnails import thumbnail_loop
 from app.user_store import UserStore
 
@@ -46,6 +48,7 @@ async def lifespan(app: FastAPI):
 
     app.state.settings = settings
     app.state.store = CameraStore(settings.cameras_file)
+    app.state.systems_store = RemoteSystemStore(settings.systems_file)
     app.state.user_store = UserStore(settings.users_file)
     bootstrap_admin(settings, app.state.user_store)
     app.state.auth_service = AuthService(settings, app.state.user_store)
@@ -85,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_motion.router)
     app.include_router(routes_onvif.router)
     app.include_router(routes_system.router)
+    app.include_router(routes_systems.router)
     app.include_router(routes_users.router)
     app.include_router(routes_settings.router)
 

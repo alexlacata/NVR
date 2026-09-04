@@ -86,6 +86,10 @@ class Settings(BaseSettings):
         return self.config_dir / "settings.yaml"
 
     @property
+    def systems_file(self) -> Path:
+        return self.config_dir / "systems.yaml"
+
+    @property
     def recordings_dir(self) -> Path:
         return self.data_dir / "recordings"
 

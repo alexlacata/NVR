@@ -367,7 +367,7 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
     visionnage en direct/à la demande reste possible, seule la copie
     locale est bloquée.
   - `Gérer les paramètres serveur` (rétention, disque, HLS, vignettes —
-    voir ci-dessous).
+    voir ci-dessous — et gestion de l'annuaire *Mes systèmes*).
 
   Un administrateur a toujours accès à tout, quoi que ces cases indiquent.
   La gestion des comptes elle-même (créer/supprimer un utilisateur, changer
@@ -417,6 +417,30 @@ effet et la gestion des comptes se fait entièrement depuis la page
   ouvrir aucun port sur votre box internet. Si vous exposez malgré tout le
   service sur Internet, placez-le derrière un reverse proxy HTTPS (ex.
   Caddy, Nginx + Let's Encrypt) et gardez un mot de passe fort.
+
+## Plusieurs boîtiers NVR : l'annuaire « Mes systèmes »
+
+Si vous gérez plusieurs installations NVR séparées (une par site — maison,
+chalet, local pro...), chacune avec ses propres caméras et son propre
+compte, la page **Mes systèmes** (lien dans la barre du tableau de bord)
+tient l'annuaire de tous vos boîtiers :
+
+- **Ajouter un système** : un nom, une adresse (IP ou domaine, avec ou
+  sans port — `192.168.1.50:8000` suffit, `http://` est ajouté
+  automatiquement), et une note optionnelle. Réservé aux comptes avec la
+  permission *Gérer les paramètres serveur*.
+- **État en ligne / hors ligne** : vérifié directement par le navigateur de
+  l'appareil qui affiche la page (pas par le serveur) — c'est volontaire,
+  puisque la joignabilité dépend d'où vous êtes à cet instant. Un système
+  peut donc apparaître hors ligne depuis votre téléphone en 4G mais en
+  ligne depuis l'ordinateur de la maison, et inversement.
+- **Cliquer sur l'adresse** ouvre l'interface de ce système dans un nouvel
+  onglet. Chaque boîtier reste totalement indépendant : pas de compte ni
+  de données partagées entre eux, uniquement ce carnet d'adresses.
+
+Ce n'est qu'un annuaire — il n'établit aucune connexion entre vos NVR ni
+ne centralise leurs caméras ; il vous fait juste gagner le temps de
+retaper chaque adresse.
 
 ## Déploiement avec un routeur 4G (Peplink ou équivalent)
 
@@ -538,6 +562,7 @@ app/
   store.py            persistance des caméras (YAML)
   user_store.py         persistance des comptes utilisateurs (YAML, mots de passe hachés)
   settings_store.py      persistance des réglages serveur modifiables depuis l'UI (YAML)
+  systems_store.py        persistance de l'annuaire "Mes systemes" (autres boitiers NVR, YAML)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
   retention.py         purge automatique des enregistrements et vignettes
