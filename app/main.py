@@ -13,6 +13,7 @@ from app.api import (
     routes_cameras,
     routes_media,
     routes_motion,
+    routes_notifications,
     routes_onvif,
     routes_ptz,
     routes_settings,
@@ -21,10 +22,13 @@ from app.api import (
     routes_users,
 )
 from app.auth import AuthService, bootstrap_admin
+from app.camera_health import CameraHealthRegistry, camera_health_loop
 from app.config import get_settings
 from app.ffmpeg_manager import StreamManager
 from app.login_throttle import LoginThrottle
 from app.motion import MotionRegistry, motion_loop
+from app.notification_settings_store import NotificationSettingsStore
+from app.notifier import Notifier
 from app.ptz_registry import PTZRegistry
 from app.recording_schedule import recording_schedule_loop
 from app.retention import retention_loop
@@ -61,16 +65,31 @@ async def lifespan(app: FastAPI):
     app.state.stream_manager = StreamManager(settings)
     app.state.ptz_registry = PTZRegistry()
     app.state.motion_registry = MotionRegistry(settings.motion_dir)
+    app.state.notification_settings_store = NotificationSettingsStore(settings.notification_settings_file)
+    app.state.notifier = Notifier(app.state.notification_settings_store)
+    app.state.camera_health_registry = CameraHealthRegistry()
 
     await app.state.stream_manager.reconcile(app.state.store.list())
 
     stop_event = asyncio.Event()
     app.state.retention_stop_event = stop_event
-    retention_task = asyncio.create_task(retention_loop(settings, stop_event))
+    retention_task = asyncio.create_task(retention_loop(settings, stop_event, app.state.notifier))
     thumbnail_task = asyncio.create_task(thumbnail_loop(settings, app.state.store, stop_event))
-    motion_task = asyncio.create_task(motion_loop(settings, app.state.store, app.state.motion_registry, stop_event))
+    motion_task = asyncio.create_task(
+        motion_loop(settings, app.state.store, app.state.motion_registry, stop_event, app.state.notifier)
+    )
     schedule_task = asyncio.create_task(
         recording_schedule_loop(app.state.store, app.state.stream_manager, stop_event)
+    )
+    camera_health_task = asyncio.create_task(
+        camera_health_loop(
+            settings,
+            app.state.store,
+            app.state.stream_manager,
+            app.state.notifier,
+            app.state.camera_health_registry,
+            stop_event,
+        )
     )
 
     try:
@@ -81,6 +100,7 @@ async def lifespan(app: FastAPI):
         await thumbnail_task
         await motion_task
         await schedule_task
+        await camera_health_task
         await app.state.stream_manager.stop_all()
 
 
@@ -92,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_media.router)
     app.include_router(routes_ptz.router)
     app.include_router(routes_motion.router)
+    app.include_router(routes_notifications.router)
     app.include_router(routes_onvif.router)
     app.include_router(routes_system.router)
     app.include_router(routes_systems.router)

@@ -102,6 +102,48 @@
       </form>
     </div>
 
+    <div class="section-title">Notifications</div>
+    <div class="card" style="padding:16px 18px">
+      <p class="hint" style="margin-top:0">
+        Recevez une alerte quand une camera detecte un mouvement, quand une camera
+        passe hors ligne (ou revient), ou quand l'espace disque devient critique -
+        par webhook (n'importe quelle URL acceptant un POST JSON : Discord, Slack,
+        Home Assistant, ntfy, IFTTT...) et/ou par e-mail.
+      </p>
+      <form class="form-grid" id="notif-form">
+        <label class="checkbox-row"><input type="checkbox" id="n-webhook-enabled"> Activer le webhook</label>
+        <div><label>URL du webhook</label><input type="text" id="n-webhook-url" placeholder="https://exemple.com/mon-webhook"></div>
+
+        <label class="checkbox-row" style="margin-top:8px"><input type="checkbox" id="n-email-enabled"> Activer l'e-mail</label>
+        <div class="row">
+          <div><label>Serveur SMTP</label><input type="text" id="n-smtp-host" placeholder="smtp.exemple.com"></div>
+          <div><label>Port</label><input type="text" inputmode="numeric" id="n-smtp-port" placeholder="587"></div>
+        </div>
+        <div class="row">
+          <div><label>Utilisateur SMTP</label><input type="text" id="n-smtp-user"></div>
+          <div><label>Mot de passe SMTP</label><input type="password" id="n-smtp-pass" autocomplete="new-password"></div>
+        </div>
+        <label class="checkbox-row"><input type="checkbox" id="n-smtp-tls"> Utiliser STARTTLS</label>
+        <div class="row">
+          <div><label>Adresse expediteur</label><input type="text" id="n-smtp-from" placeholder="nvr@exemple.com"></div>
+          <div><label>Destinataire(s) (separes par des virgules)</label><input type="text" id="n-smtp-to" placeholder="moi@exemple.com"></div>
+        </div>
+
+        <div class="hint" style="margin-top:8px">Types d'alertes</div>
+        <div style="display:flex;flex-wrap:wrap;gap:14px">
+          <label class="checkbox-row"><input type="checkbox" id="n-on-motion"> Mouvement detecte</label>
+          <label class="checkbox-row"><input type="checkbox" id="n-on-offline"> Camera hors ligne / de retour</label>
+          <label class="checkbox-row"><input type="checkbox" id="n-on-disk"> Espace disque faible</label>
+        </div>
+
+        <div class="error-msg" id="notif-error"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="submit" class="btn">Enregistrer les notifications</button>
+          <button type="button" class="btn secondary" id="btn-notif-test">Envoyer un test</button>
+        </div>
+      </form>
+    </div>
+
   </div>
 </div>
 
@@ -317,6 +359,61 @@ document.getElementById("server-form").addEventListener("submit", async (ev) => 
   }
 });
 
+async function loadNotificationSettings() {
+  const n = await apiJson("/api/notifications/settings");
+  document.getElementById("n-webhook-enabled").checked = n.webhook_enabled;
+  document.getElementById("n-webhook-url").value = n.webhook_url || "";
+  document.getElementById("n-email-enabled").checked = n.email_enabled;
+  document.getElementById("n-smtp-host").value = n.smtp_host || "";
+  document.getElementById("n-smtp-port").value = n.smtp_port;
+  document.getElementById("n-smtp-user").value = n.smtp_username || "";
+  document.getElementById("n-smtp-pass").value = n.smtp_password || "";
+  document.getElementById("n-smtp-tls").checked = n.smtp_use_tls;
+  document.getElementById("n-smtp-from").value = n.smtp_from || "";
+  document.getElementById("n-smtp-to").value = n.smtp_to || "";
+  document.getElementById("n-on-motion").checked = n.notify_on_motion;
+  document.getElementById("n-on-offline").checked = n.notify_on_camera_offline;
+  document.getElementById("n-on-disk").checked = n.notify_on_disk_low;
+}
+
+document.getElementById("notif-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("notif-error");
+  errorEl.textContent = "";
+  try {
+    await apiJson("/api/notifications/settings", {
+      method: "PATCH",
+      body: JSON.stringify({
+        webhook_enabled: document.getElementById("n-webhook-enabled").checked,
+        webhook_url: document.getElementById("n-webhook-url").value || null,
+        email_enabled: document.getElementById("n-email-enabled").checked,
+        smtp_host: document.getElementById("n-smtp-host").value || null,
+        smtp_port: Number(document.getElementById("n-smtp-port").value) || 587,
+        smtp_username: document.getElementById("n-smtp-user").value || null,
+        smtp_password: document.getElementById("n-smtp-pass").value || null,
+        smtp_use_tls: document.getElementById("n-smtp-tls").checked,
+        smtp_from: document.getElementById("n-smtp-from").value || null,
+        smtp_to: document.getElementById("n-smtp-to").value || null,
+        notify_on_motion: document.getElementById("n-on-motion").checked,
+        notify_on_camera_offline: document.getElementById("n-on-offline").checked,
+        notify_on_disk_low: document.getElementById("n-on-disk").checked,
+      }),
+    });
+    toast("Notifications enregistrees");
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
+document.getElementById("btn-notif-test").addEventListener("click", async () => {
+  try {
+    await apiJson("/api/notifications/test", { method: "POST" });
+    toast("Notification de test envoyee");
+  } catch (e) {
+    toast(e.message);
+  }
+});
+
 (async () => {
   await requireAuth();
   renderAccessQrCode();
@@ -329,6 +426,7 @@ document.getElementById("server-form").addEventListener("submit", async (ev) => 
   if (hasPermission("settings_manage")) {
     document.getElementById("settings-section").hidden = false;
     await loadServerSettings();
+    await loadNotificationSettings();
   }
 })();
 </script>

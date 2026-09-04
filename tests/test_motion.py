@@ -133,11 +133,20 @@ class FakeMotionSettings:
 
 
 class FakeMotionCamera:
-    def __init__(self, id="cam1", motion_enabled=True, motion_sensitivity=90, motion_mask_grid=None):
+    def __init__(self, id="cam1", name="Cam 1", motion_enabled=True, motion_sensitivity=90, motion_mask_grid=None):
         self.id = id
+        self.name = name
         self.motion_enabled = motion_enabled
         self.motion_sensitivity = motion_sensitivity
         self.motion_mask_grid = motion_mask_grid or []
+
+
+class FakeNotifier:
+    def __init__(self):
+        self.motion_calls = []
+
+    async def notify_motion(self, camera_id, camera_name):
+        self.motion_calls.append((camera_id, camera_name))
 
 
 @pytestmark_ffmpeg
@@ -178,6 +187,25 @@ async def test_process_camera_no_change_does_not_trigger(tmp_path):
     state = registry.state("cam1")
     assert state.last_ratio == 0.0
     assert state.active is False
+
+
+@pytestmark_ffmpeg
+@pytest.mark.asyncio
+async def test_process_camera_notifies_on_new_motion_event(tmp_path):
+    settings = FakeMotionSettings(tmp_path)
+    hls_dir = settings.hls_dir / "cam1"
+    hls_dir.mkdir(parents=True)
+    registry = MotionRegistry(tmp_path / "motion")
+    camera = FakeMotionCamera(motion_sensitivity=90, name="Garage")
+    notifier = FakeNotifier()
+
+    await _make_solid_segment(hls_dir / "seg_000.ts", "black")
+    await process_camera(settings, camera, registry, notifier)
+    assert notifier.motion_calls == []  # first frame only seeds prev_frame, no event yet
+
+    await _make_solid_segment(hls_dir / "seg_001.ts", "white")
+    await process_camera(settings, camera, registry, notifier)
+    assert notifier.motion_calls == [("cam1", "Garage")]
 
 
 @pytest.mark.asyncio

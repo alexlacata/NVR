@@ -8,6 +8,8 @@ from app.ffmpeg_manager import StreamManager
 from app.login_throttle import LoginThrottle
 from app.models import Permission, User, UserRole, has_permission
 from app.motion import MotionRegistry
+from app.notification_settings_store import NotificationSettingsStore
+from app.notifier import Notifier
 from app.ptz_registry import PTZRegistry
 from app.settings_store import SettingsStore
 from app.store import CameraStore
@@ -53,6 +55,14 @@ def get_systems_store(request: Request) -> RemoteSystemStore:
 
 def get_login_throttle(request: Request) -> LoginThrottle:
     return request.app.state.login_throttle
+
+
+def get_notification_settings_store(request: Request) -> NotificationSettingsStore:
+    return request.app.state.notification_settings_store
+
+
+def get_notifier(request: Request) -> Notifier:
+    return request.app.state.notifier
 
 
 def require_auth(request: Request) -> User:

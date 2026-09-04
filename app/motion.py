@@ -26,6 +26,7 @@ from typing import Optional
 
 from app.config import Settings
 from app.models import MOTION_GRID_COLS, MOTION_GRID_ROWS, Camera
+from app.notifier import Notifier
 from app.store import CameraStore
 
 logger = logging.getLogger("nvr.motion")
@@ -178,22 +179,30 @@ class MotionRegistry:
         except OSError:
             logger.exception("motion: failed to append event for %s", camera_id)
 
-    def observe(self, camera_id: str, ratio: float, triggered: bool, cooldown_seconds: float) -> None:
+    def observe(self, camera_id: str, ratio: float, triggered: bool, cooldown_seconds: float) -> bool:
+        """Returns True iff a new motion *event* was actually recorded (i.e.
+        triggered, and not suppressed by the per-camera cooldown) - the
+        signal callers use to fire a one-shot notification per event
+        rather than on every single triggered check."""
         cam = self._get(camera_id)
         now_iso = datetime.now(timezone.utc).isoformat()
         cam.state.last_ratio = ratio
         cam.state.last_checked_at = now_iso
         cam.state.active = triggered
         if not triggered:
-            return
+            return False
         cam.state.last_motion_at = now_iso
         now_mono = time.monotonic()
         if now_mono - cam.last_event_at >= cooldown_seconds:
             cam.last_event_at = now_mono
             self._append_event(camera_id, ratio)
+            return True
+        return False
 
 
-async def process_camera(settings: Settings, camera: Camera, registry: MotionRegistry) -> None:
+async def process_camera(
+    settings: Settings, camera: Camera, registry: MotionRegistry, notifier: Optional[Notifier] = None
+) -> None:
     if not camera.motion_enabled:
         return
     hls_dir = settings.hls_dir / camera.id
@@ -209,16 +218,24 @@ async def process_camera(settings: Settings, camera: Camera, registry: MotionReg
     if cam_state.prev_frame is not None:
         ratio = compute_changed_ratio(cam_state.prev_frame, frame, mask_pixels)
         triggered = ratio >= sensitivity_to_trigger_ratio(camera.motion_sensitivity)
-        registry.observe(camera.id, ratio, triggered, settings.motion_event_cooldown_seconds)
+        new_event = registry.observe(camera.id, ratio, triggered, settings.motion_event_cooldown_seconds)
+        if new_event and notifier is not None:
+            await notifier.notify_motion(camera.id, camera.name)
     cam_state.prev_frame = frame
 
 
-async def motion_loop(settings: Settings, store: CameraStore, registry: MotionRegistry, stop_event: asyncio.Event) -> None:
+async def motion_loop(
+    settings: Settings,
+    store: CameraStore,
+    registry: MotionRegistry,
+    stop_event: asyncio.Event,
+    notifier: Optional[Notifier] = None,
+) -> None:
     while not stop_event.is_set():
         try:
             for camera in store.list():
                 if camera.enabled and camera.motion_enabled:
-                    await process_camera(settings, camera, registry)
+                    await process_camera(settings, camera, registry, notifier)
         except Exception:  # pragma: no cover - defensive
             logger.exception("motion: unexpected error in loop")
         try:

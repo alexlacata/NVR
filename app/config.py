@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     # so continuous motion doesn't spam an event every single check.
     motion_event_cooldown_seconds: int = 30
 
+    # Notifications (webhook/email) health checks
+    camera_health_check_interval_seconds: int = 15
+    # A camera has to be continuously in "error" state for this long before
+    # an offline alert fires - a single ffmpeg reconnect blip (a few
+    # seconds) is normal and shouldn't page anyone.
+    camera_offline_after_seconds: int = 120
+    disk_low_notify_cooldown_seconds: int = 3600
+
     # Networking
     host: str = "0.0.0.0"
     port: int = 8000
@@ -95,6 +103,10 @@ class Settings(BaseSettings):
     @property
     def systems_file(self) -> Path:
         return self.config_dir / "systems.yaml"
+
+    @property
+    def notification_settings_file(self) -> Path:
+        return self.config_dir / "notifications.yaml"
 
     @property
     def recordings_dir(self) -> Path:

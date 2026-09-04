@@ -349,6 +349,36 @@ s'affiche sous le réglage de sensibilité. La fréquence de vérification
 (`NVR_MOTION_CHECK_INTERVAL_SECONDS`, 5 secondes par défaut) est un réglage
 serveur global.
 
+## Notifications (webhook et e-mail)
+
+Depuis **Paramètres → Notifications** (réservé aux comptes avec la
+permission *Gérer les paramètres serveur*), configurez une alerte pour
+trois évènements :
+
+- **Mouvement détecté** sur une caméra.
+- **Caméra hors ligne** : une caméra reste en erreur de flux de façon
+  continue pendant plus de 2 minutes (une simple micro-coupure/reconnexion
+  ffmpeg de quelques secondes, normale, ne déclenche rien) — avec une
+  alerte symétrique **caméra de nouveau en ligne** au retour.
+- **Espace disque faible** : le nettoyage automatique (purge des plus
+  anciens enregistrements) n'a pas suffi à repasser au-dessus du seuil
+  configuré. Une alerte au maximum par heure pour éviter le spam si le
+  disque reste plein.
+
+Deux canaux, activables indépendamment et simultanément :
+
+- **Webhook** : une URL qui reçoit un `POST` JSON `{event, title, message,
+  at}` — compatible avec un webhook entrant Discord/Slack, Home Assistant,
+  [ntfy.sh](https://ntfy.sh/), IFTTT, ou tout endpoint HTTP maison.
+- **E-mail** : via un serveur SMTP classique (identifiants, port, STARTTLS,
+  expéditeur, un ou plusieurs destinataires séparés par des virgules).
+
+Le bouton **Envoyer un test** déclenche immédiatement les deux canaux
+activés, pour vérifier la configuration sans attendre un vrai évènement.
+L'envoi est best-effort : un webhook injoignable ou un SMTP mal configuré
+est simplement journalisé côté serveur, il ne bloque jamais
+l'enregistrement ni la détection de mouvement.
+
 ## Comptes utilisateurs et paramètres serveur
 
 Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
@@ -375,7 +405,8 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
     visionnage en direct/à la demande reste possible, seule la copie
     locale est bloquée.
   - `Gérer les paramètres serveur` (rétention, disque, HLS, vignettes —
-    voir ci-dessous — et gestion de l'annuaire *Mes systèmes*).
+    voir ci-dessous —, gestion de l'annuaire *Mes systèmes*, et
+    configuration des notifications webhook/e-mail).
 
   Un administrateur a toujours accès à tout, quoi que ces cases indiquent.
   La gestion des comptes elle-même (créer/supprimer un utilisateur, changer
@@ -582,6 +613,10 @@ app/
   user_store.py         persistance des comptes utilisateurs (YAML, mots de passe hachés)
   settings_store.py      persistance des réglages serveur modifiables depuis l'UI (YAML)
   systems_store.py        persistance de l'annuaire "Mes systemes" (autres boitiers NVR, YAML)
+  notification_settings_store.py  persistance des reglages de notification webhook/e-mail (YAML)
+  notifier.py               envoi effectif des notifications (webhook + SMTP), best-effort
+  camera_health.py          detecte les transitions hors-ligne/de retour d'une camera pour les notifications
+  login_throttle.py         anti-bruteforce du login (blocage temporaire par compte)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
   retention.py         purge automatique des enregistrements et vignettes

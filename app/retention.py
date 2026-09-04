@@ -11,8 +11,10 @@ import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 from app.config import Settings
+from app.notifier import Notifier
 
 logger = logging.getLogger("nvr.retention")
 
@@ -22,6 +24,7 @@ class RetentionReport:
     deleted_files: int = 0
     freed_bytes: int = 0
     reason: str = ""
+    free_percent: float = 100.0
 
 
 def _iter_files(base_dir: Path, pattern: str):
@@ -59,6 +62,7 @@ def enforce_retention(settings: Settings) -> RetentionReport:
 
     usage = shutil.disk_usage(settings.data_dir)
     free_percent = 100.0 * usage.free / usage.total if usage.total else 100.0
+    report.free_percent = free_percent
     if free_percent >= settings.min_free_disk_percent:
         return report
 
@@ -66,6 +70,7 @@ def enforce_retention(settings: Settings) -> RetentionReport:
     for f in files:
         usage = shutil.disk_usage(settings.data_dir)
         free_percent = 100.0 * usage.free / usage.total if usage.total else 100.0
+        report.free_percent = free_percent
         if free_percent >= settings.min_free_disk_percent:
             break
         size = _safe_size(f)
@@ -105,10 +110,18 @@ def _safe_mtime(path: Path) -> float:
         return time.time()
 
 
-async def retention_loop(settings: Settings, stop_event: asyncio.Event) -> None:
+async def retention_loop(
+    settings: Settings, stop_event: asyncio.Event, notifier: Optional[Notifier] = None
+) -> None:
     while not stop_event.is_set():
         try:
-            await asyncio.to_thread(enforce_retention, settings)
+            report = await asyncio.to_thread(enforce_retention, settings)
+            if notifier is not None and report.free_percent < settings.min_free_disk_percent:
+                # Cleanup ran and still couldn't bring free space back above
+                # the threshold - genuinely critical, worth an alert (with
+                # its own cooldown so a persistently full disk doesn't spam
+                # one message per retention check).
+                await notifier.notify_disk_low(report.free_percent, settings.disk_low_notify_cooldown_seconds)
         except Exception:  # pragma: no cover - defensive
             logger.exception("retention: unexpected error")
         try:
