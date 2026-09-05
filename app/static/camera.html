@@ -501,10 +501,26 @@ async function loadRecordings(date) {
       const dlLink = hasPermission("recordings_download")
         ? el("a", { class: "icon-btn", href: `/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}/download`, download: f.filename }, "⬇")
         : null;
+      const checksumBtn = hasPermission("recordings_download") ? el("button", {
+        class: "icon-btn", title: "Empreinte SHA256 (verification d'integrite)",
+        onclick: async () => {
+          try {
+            const data = await apiJson(`/api/cameras/${encodeURIComponent(camId)}/recordings/${f.filename}/checksum`);
+            try {
+              await navigator.clipboard.writeText(data.sha256);
+              toast("Empreinte SHA256 copiee dans le presse-papiers");
+            } catch (e) {
+              prompt("Empreinte SHA256 (Ctrl+C pour copier) :", data.sha256);
+            }
+          } catch (e) {
+            toast(e.message);
+          }
+        },
+      }, "#") : null;
       const delBtn = hasPermission("recordings_delete") ? el("button", { class: "icon-btn", onclick: () => deleteRecording(f) }, "🗑") : null;
       list.appendChild(el("div", { class: "rec-item" }, [
         el("span", {}, `${f.time} - ${fmtBytes(f.size_bytes)}`),
-        el("div", { class: "rec-actions" }, [playBtn, dlLink, delBtn]),
+        el("div", { class: "rec-actions" }, [playBtn, dlLink, checksumBtn, delBtn]),
       ]));
     });
     container.appendChild(el("div", { class: "rec-group" }, [

@@ -304,6 +304,15 @@ vignettes ne coûtent aucune bande passante caméra supplémentaire : elles
 sont extraites localement des fichiers déjà enregistrés, jamais d'une
 connexion en direct.
 
+À côté du bouton de téléchargement ⬇, le bouton **#** calcule l'empreinte
+SHA256 de l'enregistrement (telle qu'elle est réellement sur le disque à
+cet instant) et la copie dans le presse-papiers — utile pour prouver
+qu'une copie téléchargée n'a pas été altérée (chaîne de traçabilité), en
+la comparant à `sha256sum` sur le fichier téléchargé. Calculée à la
+demande, pas stockée : deux appels peuvent donner des empreintes
+différentes si le fichier a changé entre-temps (rare, mais possible tant
+qu'un segment est encore en cours d'écriture).
+
 ## Programmer l'enregistrement (préréglages horaires)
 
 Par défaut, une caméra enregistre en continu tant que **Enregistrer** est

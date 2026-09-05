@@ -19,7 +19,7 @@ from app.deps import (
     require_recordings_download,
 )
 from app.models import User
-from app.recordings import RECORDING_NAME_RE, list_recording_segments
+from app.recordings import RECORDING_NAME_RE, list_recording_segments, sha256_of_file
 from app.store import CameraNotFound, CameraStore
 
 router = APIRouter(prefix="/api/cameras", tags=["media"], dependencies=[Depends(require_auth)])
@@ -253,6 +253,30 @@ def download_recording(
     path = _resolve_recording_path(settings, camera_id, filename)
     audit_log.record(user.username, "download", camera_id, filename)
     return FileResponse(path, media_type="video/mp4", filename=filename)
+
+
+@router.get(
+    "/{camera_id}/recordings/{filename}/checksum",
+    dependencies=[Depends(require_recordings_download)],
+)
+def get_recording_checksum(
+    camera_id: str,
+    filename: str,
+    store: CameraStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+):
+    """SHA256 of a recording, computed on demand from the file currently on
+    disk - for chain-of-custody purposes (prove a downloaded copy matches
+    what the NVR actually holds). Gated behind the same permission as
+    download, since checksumming only matters once you have a copy to
+    verify against."""
+    _require_camera(camera_id, store)
+    path = _resolve_recording_path(settings, camera_id, filename)
+    return {
+        "filename": filename,
+        "sha256": sha256_of_file(path),
+        "size_bytes": path.stat().st_size,
+    }
 
 
 @router.delete("/{camera_id}/recordings/{filename}", status_code=204, dependencies=[Depends(require_recordings_delete)])
