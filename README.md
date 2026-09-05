@@ -393,7 +393,16 @@ par minute ; chaque téléchargement explicite est toujours enregistré.
 
 Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
 
-- **Mon compte** : changer son propre mot de passe (tous les comptes).
+- **Mon compte** : changer son propre mot de passe (tous les comptes), et
+  activer/désactiver la **double authentification (2FA)** — un code à
+  usage unique généré par une application d'authentification (Google
+  Authenticator, Authy, 2FAS, ...), en plus du mot de passe. Activation :
+  *Paramètres → Mon compte → Activer la double authentification*, scanner
+  le QR code (ou saisir la clé manuellement), puis confirmer avec le
+  premier code généré — la 2FA ne s'active vraiment qu'une fois ce code
+  vérifié, pas dès le scan. Une fois activée, le mot de passe seul ne
+  suffit plus à se connecter ; désactiver demande de ressaisir le mot de
+  passe.
 - **Utilisateurs** *(administrateurs uniquement)* : créer des comptes,
   changer le rôle d'un compte (**Administrateur** ou **Lecteur**), supprimer
   un compte, et — pour un compte **Lecteur** — cocher précisément ce qu'il a
@@ -652,6 +661,7 @@ app/
   notifier.py               envoi effectif des notifications (webhook + SMTP), best-effort
   camera_health.py          detecte les transitions hors-ligne/de retour d'une camera pour les notifications
   audit_log.py              journal d'acces aux enregistrements (qui a regarde/telecharge quoi, quand)
+  totp.py                   TOTP (RFC 6238) pour la double authentification, code hors dependance
   login_throttle.py         anti-bruteforce du login (blocage temporaire par compte)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)

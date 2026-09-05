@@ -28,9 +28,13 @@
         <label for="password">Mot de passe</label>
         <input type="password" id="password" autocomplete="current-password" required>
       </div>
+      <div id="totp-field" hidden>
+        <label for="totp-code">Code de verification (application d'authentification)</label>
+        <input type="text" id="totp-code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456">
+      </div>
       <div class="error-msg" id="error"></div>
       <div class="actions">
-        <button type="submit" class="btn" style="width:100%">Se connecter</button>
+        <button type="submit" class="btn" style="width:100%" id="login-submit">Se connecter</button>
       </div>
     </form>
   </div>
@@ -43,14 +47,23 @@ document.getElementById("login-form").addEventListener("submit", async (ev) => {
   errorEl.textContent = "";
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
+  const totpField = document.getElementById("totp-field");
+  const totp_code = document.getElementById("totp-code").value || undefined;
   try {
     const resp = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, totp_code }),
     });
     if (!resp.ok) {
       const data = await resp.json().catch(() => ({}));
+      if (data.totp_required) {
+        totpField.hidden = false;
+        document.getElementById("totp-code").focus();
+        document.getElementById("login-submit").textContent = "Valider le code";
+        errorEl.textContent = data.detail || "Code de verification requis";
+        return;
+      }
       throw new Error(data.detail || "Connexion impossible");
     }
     location.href = "/index.html";

@@ -132,6 +132,17 @@ class UserStore:
             self._write(users)
             return merged
 
+    def set_totp(self, username: str, secret: Optional[str], enabled: bool) -> User:
+        with self._lock:
+            users = self._read()
+            key = self._key(username)
+            if key not in users:
+                raise UserNotFound(username)
+            merged = User(**users[key]).model_copy(update={"totp_secret": secret, "totp_enabled": enabled})
+            users[key] = merged.model_dump(mode="json")
+            self._write(users)
+            return merged
+
     def delete(self, username: str) -> None:
         with self._lock:
             users = self._read()

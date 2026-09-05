@@ -297,10 +297,18 @@ class PasswordChange(BaseModel):
 class User(UserBase):
     password_hash: str
     created_at: str
+    # 2FA (TOTP): totp_secret is set (pending) as soon as enrollment starts,
+    # but totp_enabled only flips to True once the user proves they can
+    # generate a valid code with it (see /api/auth/totp/confirm) - so a
+    # half-finished enrollment never silently protects (or locks out) the
+    # account.
+    totp_secret: Optional[str] = None
+    totp_enabled: bool = False
 
 
 class UserPublic(UserBase):
     created_at: str
+    totp_enabled: bool = False
 
 
 class RuntimeSettingsUpdate(BaseModel):

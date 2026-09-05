@@ -41,6 +41,39 @@
     </form>
   </div>
 
+  <div class="section-title">Double authentification (2FA)</div>
+  <div class="card" style="padding:16px 18px">
+    <p class="hint" id="totp-status" style="margin-top:0"></p>
+
+    <div id="totp-disabled-section">
+      <p class="hint">
+        Protege votre compte avec un code a usage unique genere par une application
+        d'authentification (Google Authenticator, Authy, 2FAS, ...), en plus du mot de passe.
+      </p>
+      <button type="button" class="btn secondary" id="btn-totp-start">Activer la double authentification</button>
+
+      <div id="totp-enroll-panel" hidden style="margin-top:14px">
+        <div id="totp-qr" style="display:inline-block;background:#fff;padding:10px;border-radius:8px;line-height:0"></div>
+        <p class="hint tabular" id="totp-secret-text" style="word-break:break-all"></p>
+        <p class="hint">Scannez ce code (ou saisissez la cle manuellement) dans votre application, puis entrez le code genere pour confirmer :</p>
+        <form class="form-grid" id="totp-confirm-form">
+          <div><label>Code de verification</label><input type="text" id="totp-confirm-code" inputmode="numeric" placeholder="123456"></div>
+          <div class="error-msg" id="totp-confirm-error"></div>
+          <div><button type="submit" class="btn">Confirmer et activer</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div id="totp-enabled-section" hidden>
+      <p class="hint">La double authentification est active sur ce compte.</p>
+      <form class="form-grid" id="totp-disable-form">
+        <div><label>Mot de passe (pour desactiver)</label><input type="password" id="totp-disable-password" autocomplete="current-password"></div>
+        <div class="error-msg" id="totp-disable-error"></div>
+        <div><button type="submit" class="btn secondary">Desactiver la double authentification</button></div>
+      </form>
+    </div>
+  </div>
+
   <div id="admin-only-section" hidden>
 
     <div class="section-title">Utilisateurs</div>
@@ -317,6 +350,69 @@ document.getElementById("password-form").addEventListener("submit", async (ev) =
   }
 });
 
+async function loadTotpStatus() {
+  const me = await apiJson("/api/auth/me");
+  document.getElementById("totp-status").textContent = me.totp_enabled
+    ? "Statut : activee."
+    : "Statut : desactivee.";
+  document.getElementById("totp-disabled-section").hidden = me.totp_enabled;
+  document.getElementById("totp-enabled-section").hidden = !me.totp_enabled;
+  document.getElementById("totp-enroll-panel").hidden = true;
+}
+
+document.getElementById("btn-totp-start").addEventListener("click", async () => {
+  try {
+    const data = await apiJson("/api/auth/totp/enroll", { method: "POST" });
+    document.getElementById("totp-secret-text").textContent = `Cle : ${data.secret}`;
+    const qrEl = document.getElementById("totp-qr");
+    qrEl.innerHTML = "";
+    new QRCode(qrEl, {
+      text: data.otpauth_uri,
+      width: 176,
+      height: 176,
+      colorDark: "#0f1115",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+    document.getElementById("totp-enroll-panel").hidden = false;
+  } catch (e) {
+    toast(e.message);
+  }
+});
+
+document.getElementById("totp-confirm-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("totp-confirm-error");
+  errorEl.textContent = "";
+  try {
+    await apiJson("/api/auth/totp/confirm", {
+      method: "POST",
+      body: JSON.stringify({ code: document.getElementById("totp-confirm-code").value }),
+    });
+    toast("Double authentification activee");
+    await loadTotpStatus();
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
+document.getElementById("totp-disable-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("totp-disable-error");
+  errorEl.textContent = "";
+  try {
+    await apiJson("/api/auth/totp/disable", {
+      method: "POST",
+      body: JSON.stringify({ password: document.getElementById("totp-disable-password").value }),
+    });
+    document.getElementById("totp-disable-form").reset();
+    toast("Double authentification desactivee");
+    await loadTotpStatus();
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
 async function loadServerSettings() {
   const s = await apiJson("/api/settings");
   document.getElementById("s-retention-days").value = s.retention_days;
@@ -425,6 +521,7 @@ document.getElementById("btn-notif-test").addEventListener("click", async () => 
   renderAccessQrCode();
   document.getElementById("whoami").textContent =
     `Connecte en tant que ${currentUser.username} (${currentUser.role === "admin" ? "administrateur" : "lecteur"}).`;
+  await loadTotpStatus();
   if (isAdmin()) {
     document.getElementById("admin-only-section").hidden = false;
     await loadUsers();
