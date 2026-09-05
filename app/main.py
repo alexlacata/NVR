@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (
+    routes_audit,
     routes_auth,
     routes_cameras,
     routes_media,
@@ -21,6 +22,7 @@ from app.api import (
     routes_systems,
     routes_users,
 )
+from app.audit_log import AuditLog
 from app.auth import AuthService, bootstrap_admin
 from app.camera_health import CameraHealthRegistry, camera_health_loop
 from app.config import get_settings
@@ -68,6 +70,7 @@ async def lifespan(app: FastAPI):
     app.state.notification_settings_store = NotificationSettingsStore(settings.notification_settings_file)
     app.state.notifier = Notifier(app.state.notification_settings_store)
     app.state.camera_health_registry = CameraHealthRegistry()
+    app.state.audit_log = AuditLog(settings.audit_log_file)
 
     await app.state.stream_manager.reconcile(app.state.store.list())
 
@@ -111,6 +114,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_cameras.router)
     app.include_router(routes_media.router)
     app.include_router(routes_ptz.router)
+    app.include_router(routes_audit.router)
     app.include_router(routes_motion.router)
     app.include_router(routes_notifications.router)
     app.include_router(routes_onvif.router)

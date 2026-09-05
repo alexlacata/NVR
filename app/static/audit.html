@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NVR">
+<meta name="mobile-web-app-capable" content="yes">
+<title>NVR - Journal d'activite</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1><a href="/settings.html" style="color:inherit">←</a> Journal d'activite</h1>
+  <div class="actions">
+    <button class="btn secondary" id="btn-refresh">Actualiser</button>
+    <button class="btn secondary" id="btn-logout">Deconnexion</button>
+  </div>
+</div>
+<div class="container">
+
+  <p class="hint" style="margin-top:0">
+    Qui a regarde ou telecharge quel enregistrement, et quand - reserve aux
+    administrateurs. Les visionnages rapproches du meme fichier (lecture en
+    cours, deplacement dans la ligne du temps) ne comptent que pour une
+    seule ligne.
+  </p>
+
+  <div id="audit-list" class="rec-list"></div>
+  <div id="audit-empty" class="empty-state" hidden>
+    <p>Aucune activite enregistree pour l'instant.</p>
+  </div>
+
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+document.getElementById("btn-logout").addEventListener("click", logout);
+
+function fmtDate(iso) {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch (e) {
+    return iso;
+  }
+}
+
+async function loadAudit() {
+  const listEl = document.getElementById("audit-list");
+  const emptyEl = document.getElementById("audit-empty");
+  listEl.innerHTML = '<div class="spinner-row">Chargement...</div>';
+  const entries = await apiJson("/api/audit");
+  listEl.innerHTML = "";
+  emptyEl.hidden = entries.length !== 0;
+  entries.forEach((e) => {
+    const actionLabel = e.action === "download" ? "Telecharge" : "Regarde";
+    listEl.appendChild(el("div", { class: "rec-item" }, [
+      el("div", { style: "min-width:0" }, [
+        el("div", {}, [
+          el("strong", {}, e.username),
+          document.createTextNode(` a ${actionLabel.toLowerCase()} `),
+          el("span", { class: "hint tabular" }, `${e.camera_id} / ${e.filename}`),
+        ]),
+        el("div", { class: "hint", style: "margin-top:2px" }, fmtDate(e.at)),
+      ]),
+    ]));
+  });
+}
+
+document.getElementById("btn-refresh").addEventListener("click", loadAudit);
+
+(async () => {
+  await requireAuth();
+  if (!isAdmin()) {
+    document.querySelector(".container").innerHTML =
+      '<p class="hint">Reserve aux administrateurs.</p>';
+    return;
+  }
+  await loadAudit();
+})();
+</script>
+</body>
+</html>

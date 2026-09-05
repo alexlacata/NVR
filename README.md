@@ -379,6 +379,16 @@ L'envoi est best-effort : un webhook injoignable ou un SMTP mal configuré
 est simplement journalisé côté serveur, il ne bloque jamais
 l'enregistrement ni la détection de mouvement.
 
+## Journal d'activité
+
+Depuis **Paramètres → Journal d'activité** (réservé aux administrateurs) :
+qui a regardé ou téléchargé quel enregistrement, et quand. Utile pour
+retracer un accès après coup (chaîne de traçabilité) sur un système
+partagé entre plusieurs comptes. Les visionnages rapprochés d'un même
+fichier (lecture en cours, déplacement dans la ligne du temps, qui
+déclenchent plusieurs requêtes HTTP) ne comptent que pour une seule ligne
+par minute ; chaque téléchargement explicite est toujours enregistré.
+
 ## Comptes utilisateurs et paramètres serveur
 
 Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
@@ -641,6 +651,7 @@ app/
   notification_settings_store.py  persistance des reglages de notification webhook/e-mail (YAML)
   notifier.py               envoi effectif des notifications (webhook + SMTP), best-effort
   camera_health.py          detecte les transitions hors-ligne/de retour d'une camera pour les notifications
+  audit_log.py              journal d'acces aux enregistrements (qui a regarde/telecharge quoi, quand)
   login_throttle.py         anti-bruteforce du login (blocage temporaire par compte)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, Request, status
 
+from app.audit_log import AuditLog
 from app.auth import COOKIE_NAME, AuthService
 from app.config import Settings
 from app.ffmpeg_manager import StreamManager
@@ -63,6 +64,10 @@ def get_notification_settings_store(request: Request) -> NotificationSettingsSto
 
 def get_notifier(request: Request) -> Notifier:
     return request.app.state.notifier
+
+
+def get_audit_log(request: Request) -> AuditLog:
+    return request.app.state.audit_log
 
 
 def require_auth(request: Request) -> User:

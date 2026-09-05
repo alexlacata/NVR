@@ -118,6 +118,10 @@ class Settings(BaseSettings):
         return self.config_dir / "notifications.yaml"
 
     @property
+    def audit_log_file(self) -> Path:
+        return self.config_dir / "audit.jsonl"
+
+    @property
     def recordings_dir(self) -> Path:
         return self.data_dir / "recordings"
 

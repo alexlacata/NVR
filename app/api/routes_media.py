@@ -8,8 +8,17 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
+from app.audit_log import AuditLog
 from app.config import Settings
-from app.deps import get_settings, get_store, require_auth, require_recordings_delete, require_recordings_download
+from app.deps import (
+    get_audit_log,
+    get_settings,
+    get_store,
+    require_auth,
+    require_recordings_delete,
+    require_recordings_download,
+)
+from app.models import User
 from app.recordings import RECORDING_NAME_RE, list_recording_segments
 from app.store import CameraNotFound, CameraStore
 
@@ -213,9 +222,12 @@ def get_recording(
     filename: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
+    audit_log: AuditLog = Depends(get_audit_log),
 ):
     _require_camera(camera_id, store)
     path = _resolve_recording_path(settings, camera_id, filename)
+    audit_log.record(user.username, "view", camera_id, filename, dedupe_seconds=60)
     return FileResponse(path, media_type="video/mp4", filename=filename)
 
 
@@ -228,6 +240,8 @@ def download_recording(
     filename: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
+    audit_log: AuditLog = Depends(get_audit_log),
 ):
     """Separate from get_recording (used for inline <video> playback, which
     stays open to any authenticated user): this is the one gated behind the
@@ -237,6 +251,7 @@ def download_recording(
     link."""
     _require_camera(camera_id, store)
     path = _resolve_recording_path(settings, camera_id, filename)
+    audit_log.record(user.username, "download", camera_id, filename)
     return FileResponse(path, media_type="video/mp4", filename=filename)
 
 
