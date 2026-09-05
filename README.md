@@ -112,6 +112,40 @@ export NVR_SECRET_KEY=$(openssl rand -hex 32)
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+Lancé ainsi, le service s'arrête si le terminal se ferme ou si le
+processus plante, et ne redémarre pas tout seul au reboot. Pour un usage
+réel (hors conteneur Docker, qui gère déjà ça via `restart: unless-stopped`
+dans `docker-compose.yml`), faites-en un service systemd :
+
+```ini
+# /etc/systemd/system/nvr.service
+[Unit]
+Description=NVR
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nvr
+EnvironmentFile=/opt/nvr/.env
+ExecStart=/opt/nvr/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now nvr.service
+```
+
+`Restart=on-failure` relance le service s'il plante (crash, exception non
+gérée) ; `WantedBy=multi-user.target` + `enable` le démarre automatiquement
+au démarrage de la machine. Adaptez `WorkingDirectory`/`ExecStart` à
+l'emplacement réel de votre installation.
+
 ## Déploiement sur Raspberry Pi
 
 Le NVR tourne tel quel sur un Raspberry Pi : l'image Docker
@@ -719,6 +753,53 @@ tests/                 tests automatisés (pytest)
 pi-image/
   firstboot.sh          script de provisionnement (Docker, clonage, .env, service systemd) pour un Raspberry Pi qui démarre sur son disque
 ```
+
+## Robustesse et limites connues
+
+Quelques points à avoir en tête pour un usage réel, au-delà de ce que le
+logiciel gère déjà tout seul (auto-restart des flux ffmpeg, purge
+automatique du disque, sauvegarde optionnelle, alertes — voir plus haut) :
+
+- **Redondance disque (RAID)** : ce NVR traite `NVR_DATA_DIR` comme un
+  disque unique — il ne fait aucune réplication lui-même. La sauvegarde
+  (*Sauvegarde vers un second emplacement* ci-dessus) protège contre la
+  perte de données, mais avec un délai (le cycle de sauvegarde) et sans
+  continuité de service : si le disque principal meurt, l'enregistrement
+  s'arrête jusqu'à intervention. Pour de la vraie redondance *sans coupure*
+  (le service continue si un disque tombe), montez `NVR_DATA_DIR` sur un
+  volume RAID1/RAID5 (mdadm, ou le RAID matériel d'un NAS) plutôt que sur
+  un disque simple — la sauvegarde vers un second emplacement reste
+  recommandée en plus, pas à la place, pour couvrir un sinistre qui
+  toucherait tout le boîtier (incendie, vol).
+- **Usage prolongé avec plusieurs flux simultanés** : chaque caméra
+  supervise deux process `ffmpeg` (enregistrement + direct) ; sur du
+  matériel modeste (Raspberry Pi, mini-PC bas de gamme), testez la charge
+  réelle (CPU, RAM, débit disque) avec le nombre de caméras et la
+  résolution que vous comptez utiliser *avant* un déploiement définitif —
+  le logiciel n'impose pas de limite artificielle, mais le matériel si.
+- **Profils de marque de caméra non validés sur du matériel réel** :
+  l'assistant d'URL par marque (Hikvision, Dahua, Reolink, etc. — voir
+  *Vous ne connaissez pas l'URL de la caméra ?*) génère des chemins RTSP
+  d'après la documentation publique de chaque marque ; aucun n'a été
+  vérifié contre une caméra physique de la marque en question. Un chemin
+  peut varier selon le modèle/firmware exact — si l'URL générée ne
+  fonctionne pas du premier coup, préférez la détection ONVIF (qui
+  interroge la caméra directement) avant de suspecter un bug.
+- **Aspect légal (vidéosurveillance)** : filmer un espace accessible à
+  des tiers (rue, entrée commune, voisinage) est encadré par la loi selon
+  votre pays/région (durée de conservation, panneau d'information
+  obligatoire, déclaration éventuelle, zones interdites comme la voie
+  publique ou la propriété du voisin selon les cas). Ce logiciel ne vous
+  dispense pas de vérifier ce qui s'applique à votre situation — c'est une
+  question juridique, pas technique.
+- **Horodatage et intégrité pour un usage "preuve"** : l'empreinte SHA256
+  à la demande (*Relire un enregistrement* ci-dessus) permet de vérifier
+  qu'une copie téléchargée n'a pas été altérée, et le journal d'activité
+  trace qui a consulté/téléchargé quoi. Il n'y a en revanche pas
+  d'horodatage signé/certifié par un tiers de confiance — si vos
+  enregistrements doivent servir de preuve dans une procédure formelle,
+  renseignez-vous sur les exigences spécifiques applicables (elles varient
+  largement selon le contexte).
 
 ## Tests
 
