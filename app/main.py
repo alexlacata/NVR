@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import (
     routes_audit,
     routes_auth,
+    routes_backup,
     routes_cameras,
     routes_media,
     routes_motion,
@@ -24,6 +25,7 @@ from app.api import (
 )
 from app.audit_log import AuditLog
 from app.auth import AuthService, bootstrap_admin
+from app.backup import BackupStatusTracker, backup_loop
 from app.camera_health import CameraHealthRegistry, camera_health_loop
 from app.config import get_settings
 from app.ffmpeg_manager import StreamManager
@@ -71,6 +73,7 @@ async def lifespan(app: FastAPI):
     app.state.notifier = Notifier(app.state.notification_settings_store)
     app.state.camera_health_registry = CameraHealthRegistry()
     app.state.audit_log = AuditLog(settings.audit_log_file)
+    app.state.backup_status = BackupStatusTracker()
 
     await app.state.stream_manager.reconcile(app.state.store.list())
 
@@ -94,6 +97,9 @@ async def lifespan(app: FastAPI):
             stop_event,
         )
     )
+    backup_task = asyncio.create_task(
+        backup_loop(settings, stop_event, app.state.notifier, app.state.backup_status)
+    )
 
     try:
         yield
@@ -104,6 +110,7 @@ async def lifespan(app: FastAPI):
         await motion_task
         await schedule_task
         await camera_health_task
+        await backup_task
         await app.state.stream_manager.stop_all()
 
 
@@ -115,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_media.router)
     app.include_router(routes_ptz.router)
     app.include_router(routes_audit.router)
+    app.include_router(routes_backup.router)
     app.include_router(routes_motion.router)
     app.include_router(routes_notifications.router)
     app.include_router(routes_onvif.router)

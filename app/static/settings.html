@@ -183,6 +183,18 @@
       </form>
     </div>
 
+    <div class="section-title">Sauvegarde</div>
+    <div class="card" style="padding:16px 18px">
+      <p class="hint" style="margin-top:0" id="backup-status-text">Chargement...</p>
+      <p class="hint">
+        Copie les enregistrements (pas les vignettes/HLS, ephemeres) vers un second
+        emplacement - un NAS monte, un second disque. Se configure via la variable
+        d'environnement <code>NVR_BACKUP_DIR</code> (chemin de dossier), pas depuis
+        cette page - redemarrez le serveur apres l'avoir renseignee.
+      </p>
+      <button type="button" class="btn secondary" id="btn-backup-run">Sauvegarder maintenant</button>
+    </div>
+
   </div>
 </div>
 
@@ -516,6 +528,35 @@ document.getElementById("btn-notif-test").addEventListener("click", async () => 
   }
 });
 
+function fmtBackupDate(iso) {
+  if (!iso) return "jamais";
+  try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+}
+
+async function loadBackupStatus() {
+  const s = await apiJson("/api/backup/status");
+  const statusEl = document.getElementById("backup-status-text");
+  if (!s.enabled) {
+    statusEl.textContent = "Non configuree (NVR_BACKUP_DIR est vide).";
+    return;
+  }
+  const parts = [`Destination : ${s.backup_dir}`, `Derniere execution : ${fmtBackupDate(s.last_run_at)}`];
+  if (s.last_run_at) {
+    parts.push(`${s.last_copied_files} fichier(s) copie(s)${s.last_failed_files ? `, ${s.last_failed_files} echec(s)` : ""}`);
+  }
+  statusEl.textContent = parts.join(" - ");
+}
+
+document.getElementById("btn-backup-run").addEventListener("click", async () => {
+  try {
+    const data = await apiJson("/api/backup/run", { method: "POST" });
+    toast(`Sauvegarde : ${data.copied_files} fichier(s) copie(s)${data.failed_files ? `, ${data.failed_files} echec(s)` : ""}`);
+    await loadBackupStatus();
+  } catch (e) {
+    toast(e.message);
+  }
+});
+
 (async () => {
   await requireAuth();
   renderAccessQrCode();
@@ -530,6 +571,7 @@ document.getElementById("btn-notif-test").addEventListener("click", async () => 
     document.getElementById("settings-section").hidden = false;
     await loadServerSettings();
     await loadNotificationSettings();
+    await loadBackupStatus();
   }
 })();
 </script>

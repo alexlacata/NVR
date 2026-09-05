@@ -388,6 +388,29 @@ L'envoi est best-effort : un webhook injoignable ou un SMTP mal configuré
 est simplement journalisé côté serveur, il ne bloque jamais
 l'enregistrement ni la détection de mouvement.
 
+## Sauvegarde vers un second emplacement
+
+Le disque local de l'enregistreur est un point de défaillance unique : s'il
+tombe en panne, tout est perdu. `NVR_BACKUP_DIR` (chemin vers un second
+dossier — NAS monté, second disque, peu importe) active une copie
+automatique et périodique des **enregistrements uniquement** (pas les
+vignettes ni les segments HLS, éphémères et reconstructibles) vers cette
+destination, en tâche de fond (`NVR_BACKUP_CHECK_INTERVAL_SECONDS`, 5
+minutes par défaut). Se configure par variable d'environnement uniquement
+(redémarrage requis, comme `NVR_DATA_DIR`), mais **Paramètres →
+Sauvegarde** affiche l'état (destination, dernière exécution, fichiers
+copiés/échoués) et propose un bouton **Sauvegarder maintenant** pour
+déclencher une copie immédiate sans attendre le prochain cycle. Un fichier
+déjà présent à l'identique (même taille) à la destination n'est pas
+recopié ; une destination temporairement injoignable (NAS débranché) ne
+bloque rien — les fichiers en échec sont retentés au cycle suivant, avec
+une notification (voir *Notifications* ci-dessus) si l'échec persiste.
+
+⚠️ Ceci protège contre une panne de disque, pas contre un incendie/vol qui
+détruirait les deux appareils au même endroit : pour une vraie
+redondance, la destination de sauvegarde devrait être dans un endroit
+physiquement différent (autre pièce, autre site).
+
 ## Journal d'activité
 
 Depuis **Paramètres → Journal d'activité** (réservé aux administrateurs) :
@@ -651,6 +674,8 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_MOTION_CHECK_INTERVAL_SECONDS` | `5` | Fréquence d'échantillonnage pour la détection de mouvement (caméras avec `motion_enabled`) — idem |
 | `NVR_PORT` | `8000` | Port d'écoute |
 | `NVR_SSL_CERTFILE` / `NVR_SSL_KEYFILE` | *(vide, HTTP)* | Chemins vers un certificat/clé TLS - lancez alors avec `python -m app.main` pour du HTTPS natif (voir *HTTPS* ci-dessus) |
+| `NVR_BACKUP_DIR` | *(vide, désactivé)* | Dossier de sauvegarde des enregistrements (voir *Sauvegarde* ci-dessus) |
+| `NVR_BACKUP_CHECK_INTERVAL_SECONDS` | `300` | Fréquence de vérification des nouveaux fichiers à copier |
 
 Les lignes marquées « idem » ci-dessus ne fixent qu'une valeur de démarrage :
 un administrateur peut les changer à tout moment depuis **Paramètres → 
@@ -671,6 +696,7 @@ app/
   camera_health.py          detecte les transitions hors-ligne/de retour d'une camera pour les notifications
   audit_log.py              journal d'acces aux enregistrements (qui a regarde/telecharge quoi, quand)
   totp.py                   TOTP (RFC 6238) pour la double authentification, code hors dependance
+  backup.py                 copie periodique des enregistrements vers un second emplacement (NVR_BACKUP_DIR)
   login_throttle.py         anti-bruteforce du login (blocage temporaire par compte)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)

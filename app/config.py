@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     # so continuous motion doesn't spam an event every single check.
     motion_event_cooldown_seconds: int = 30
 
+    # Backup: mirrors recordings (not HLS/thumbnails - those are ephemeral/
+    # derived) to a second location, e.g. a NAS mount or a second disk -
+    # blank (the default) disables it entirely. A plain directory, exactly
+    # like data_dir: whether that's a drive plugged in locally or a network
+    # share mounted at the OS level is not this app's concern.
+    backup_dir: str = ""
+    backup_check_interval_seconds: int = 300
+
     # Notifications (webhook/email) health checks
     camera_health_check_interval_seconds: int = 15
     # A camera has to be continuously in "error" state for this long before

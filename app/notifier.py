@@ -110,6 +110,20 @@ class Notifier:
             cooldown_seconds=cooldown_seconds,
         )
 
+    async def notify_backup_failed(self, backup_dir: str, failed_files: int) -> None:
+        if not self._settings_store.get().notify_on_backup_failed:
+            return
+        await self.notify(
+            event="backup_failed",
+            title="Echec de la sauvegarde",
+            message=(
+                f"{failed_files} fichier(s) n'ont pas pu etre copies vers la destination de "
+                f"sauvegarde ({backup_dir}) - verifiez qu'elle est bien montee et accessible en ecriture."
+            ),
+            dedupe_key="backup_failed",
+            cooldown_seconds=3600,
+        )
+
     async def send_test_notification(self) -> None:
         await self.notify(
             event="test",

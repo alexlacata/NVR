@@ -406,6 +406,7 @@ class NotificationSettingsBase(BaseModel):
     notify_on_motion: bool = True
     notify_on_camera_offline: bool = True
     notify_on_disk_low: bool = True
+    notify_on_backup_failed: bool = True
 
 
 class NotificationSettings(NotificationSettingsBase):
@@ -426,3 +427,4 @@ class NotificationSettingsUpdate(BaseModel):
     notify_on_motion: Optional[bool] = None
     notify_on_camera_offline: Optional[bool] = None
     notify_on_disk_low: Optional[bool] = None
+    notify_on_backup_failed: Optional[bool] = None

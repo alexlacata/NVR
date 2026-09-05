@@ -4,6 +4,7 @@ from fastapi import HTTPException, Request, status
 
 from app.audit_log import AuditLog
 from app.auth import COOKIE_NAME, AuthService
+from app.backup import BackupStatusTracker
 from app.config import Settings
 from app.ffmpeg_manager import StreamManager
 from app.login_throttle import LoginThrottle
@@ -68,6 +69,10 @@ def get_notifier(request: Request) -> Notifier:
 
 def get_audit_log(request: Request) -> AuditLog:
     return request.app.state.audit_log
+
+
+def get_backup_status(request: Request) -> BackupStatusTracker:
+    return request.app.state.backup_status
 
 
 def require_auth(request: Request) -> User:
