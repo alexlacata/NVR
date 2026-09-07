@@ -793,6 +793,8 @@ app/
   totp.py                   TOTP (RFC 6238) pour la double authentification, code hors dependance
   backup.py                 copie periodique des enregistrements vers un second emplacement (NVR_BACKUP_DIR)
   login_throttle.py         anti-bruteforce du login (blocage temporaire par compte)
+  rate_limiter.py           limitation de débit générale de l'API (au-delà du login)
+  session_store.py          persistance des sessions actives (YAML), pour lister/révoquer par compte
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
   retention.py         purge automatique des enregistrements et vignettes
@@ -811,8 +813,13 @@ app/
     icons/                icones de l'app (favicon, apple-touch-icon, icones PWA)
     js/qrcode.min.js       generateur de QR code cote client (vendored, sans dependance externe)
 tests/                 tests automatisés (pytest)
+scripts/
+  account-recovery.py     recuperation hors ligne d'un compte (mot de passe/2FA/role) sans acces admin
+  generate-self-signed-cert.sh  generation d'un certificat auto-signe pour le HTTPS natif
 pi-image/
   firstboot.sh          script de provisionnement (Docker, clonage, .env, service systemd) pour un Raspberry Pi qui démarre sur son disque
+.github/workflows/
+  tests.yml               integration continue : lance la suite de tests sur chaque push/pull request
 ```
 
 ## Robustesse et limites connues
@@ -873,6 +880,13 @@ Un test de bout en bout (`tests/test_smoke_pipeline.py`) démarre un vrai
 processus `ffmpeg` sur une source de test et vérifie que l'enregistrement et
 le flux HLS sont bien produits sur disque ; il est automatiquement ignoré si
 `ffmpeg` n'est pas installé.
+
+**Intégration continue** : `.github/workflows/tests.yml` exécute
+l'intégralité de cette suite de tests (avec `ffmpeg` installé, donc y
+compris le test de bout en bout ci-dessus) sur chaque `push` et chaque
+pull request, quelle que soit la branche — une régression ne peut donc pas
+être fusionnée silencieusement. Voir l'onglet **Actions** du dépôt GitHub
+pour le résultat des exécutions.
 
 ## Dépannage
 
