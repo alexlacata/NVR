@@ -422,6 +422,10 @@ L'envoi est best-effort : un webhook injoignable ou un SMTP mal configuré
 est simplement journalisé côté serveur, il ne bloque jamais
 l'enregistrement ni la détection de mouvement.
 
+Le mot de passe SMTP est chiffré avant d'être écrit sur disque (voir
+*Chiffrement des secrets stockés* ci-dessous) — un vol du fichier ou d'une
+sauvegarde ne l'expose pas en clair.
+
 ## Sauvegarde vers un second emplacement
 
 Le disque local de l'enregistreur est un point de défaillance unique : s'il
@@ -474,7 +478,10 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
   saisissez-le dans le même champ que le code à 6 chiffres, au format
   `XXXX-XXXX`. Un compteur indique combien il en reste ; régénérez-les à
   tout moment (mot de passe requis) pour invalider les anciens et en
-  obtenir une nouvelle série.
+  obtenir une nouvelle série. Le secret TOTP est chiffré avant d'être
+  écrit sur disque (voir *Chiffrement des secrets stockés* ci-dessous) ;
+  les codes de secours, eux, sont hachés comme un mot de passe plutôt que
+  chiffrés — ils ne sont jamais relus, seulement comparés.
 - **Utilisateurs** *(administrateurs uniquement)* : créer des comptes,
   changer le rôle d'un compte (**Administrateur** ou **Lecteur**), supprimer
   un compte, et — pour un compte **Lecteur** — cocher précisément ce qu'il a
@@ -583,6 +590,22 @@ et empêche à l'inverse qu'un compte compromis ou un client buggé ne
 martèle une route (téléchargements en boucle, appels PTZ répétés...) sans
 affecter les autres comptes. Les fichiers statiques (interface web,
 vignettes) ne sont pas concernés — seule l'API l'est.
+
+**Chiffrement des secrets stockés** : deux secrets réversibles sont
+persistés par le serveur — le mot de passe SMTP (notifications par
+e-mail) et le secret TOTP de chaque compte (2FA). Les deux sont chiffrés
+avant écriture sur disque (`notifications.yaml`, `users.yaml`), avec une
+clé dérivée de `NVR_SECRET_KEY` (la même déjà utilisée pour signer les
+sessions — voir *Configuration* ci-dessous). Concrètement, un vol du
+fichier ou d'une sauvegarde seule (sans `NVR_SECRET_KEY`) n'expose ni l'un
+ni l'autre en clair. Ça ne protège pas contre la compromission du serveur
+lui-même : le processus a besoin de la clé pour déchiffrer à la volée
+(envoyer un e-mail, vérifier un code 2FA), donc une intrusion active sur
+la machine y a accès de toute façon — la même limite que le chiffrement
+de disque. Les autres secrets du système (mots de passe de compte, codes
+de secours 2FA) ne sont pas concernés : ils sont hachés (bcrypt), pas
+chiffrés — plus fort qu'un chiffrement réversible pour une valeur qu'on ne
+fait jamais que comparer, jamais relire.
 
 ## HTTPS
 
@@ -795,6 +818,7 @@ app/
   login_throttle.py         anti-bruteforce du login (blocage temporaire par compte)
   rate_limiter.py           limitation de débit générale de l'API (au-delà du login)
   session_store.py          persistance des sessions actives (YAML), pour lister/révoquer par compte
+  secrets_crypto.py         chiffrement au repos du mot de passe SMTP et du secret TOTP (cle derivee de NVR_SECRET_KEY)
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
   retention.py         purge automatique des enregistrements et vignettes

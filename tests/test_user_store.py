@@ -1,6 +1,8 @@
 import pytest
+import yaml
 
 from app.models import UserCreate, UserRole, UserUpdate
+from app.secrets_crypto import SecretsCipher
 from app.user_store import DuplicateUsername, LastAdminError, UserNotFound, UserStore, pwd_context
 
 
@@ -136,3 +138,50 @@ def test_try_consume_recovery_code_wrong_code_or_user(store):
     store.set_totp_recovery_codes("alice", [pwd_context.hash("AAAA-BBBB")])
     assert store.try_consume_recovery_code("alice", "ZZZZ-ZZZZ") is False
     assert store.try_consume_recovery_code("nobody", "AAAA-BBBB") is False
+
+
+def test_totp_secret_is_encrypted_at_rest(tmp_path):
+    path = tmp_path / "users.yaml"
+    cipher = SecretsCipher("a-secret-key")
+    store = UserStore(path, cipher)
+    store.create(UserCreate(username="alice", password="s3cretpass"))
+    store.set_totp("alice", secret="JBSWY3DPEHPK3PXP", enabled=True)
+
+    on_disk = yaml.safe_load(path.read_text())
+    stored_secret = on_disk["users"]["alice"]["totp_secret"]
+    assert stored_secret != "JBSWY3DPEHPK3PXP"
+    assert cipher.decrypt(stored_secret) == "JBSWY3DPEHPK3PXP"
+
+    # transparently decrypted for the store's own callers
+    assert store.get("alice").totp_secret == "JBSWY3DPEHPK3PXP"
+
+
+def test_totp_secret_roundtrips_across_store_instances(tmp_path):
+    path = tmp_path / "users.yaml"
+    cipher = SecretsCipher("a-secret-key")
+    UserStore(path, cipher).create(UserCreate(username="alice", password="s3cretpass"))
+    UserStore(path, cipher).set_totp("alice", secret="JBSWY3DPEHPK3PXP", enabled=True)
+
+    reopened = UserStore(path, cipher)
+    assert reopened.get("alice").totp_secret == "JBSWY3DPEHPK3PXP"
+
+
+def test_without_a_cipher_totp_secret_stays_plaintext(tmp_path):
+    path = tmp_path / "users.yaml"
+    store = UserStore(path)
+    store.create(UserCreate(username="alice", password="s3cretpass"))
+    store.set_totp("alice", secret="JBSWY3DPEHPK3PXP", enabled=True)
+
+    on_disk = yaml.safe_load(path.read_text())
+    assert on_disk["users"]["alice"]["totp_secret"] == "JBSWY3DPEHPK3PXP"
+
+
+def test_a_preexisting_plaintext_secret_still_works_once_a_cipher_is_added(tmp_path):
+    path = tmp_path / "users.yaml"
+    UserStore(path).create(UserCreate(username="alice", password="s3cretpass"))
+    UserStore(path).set_totp("alice", secret="JBSWY3DPEHPK3PXP", enabled=True)
+
+    # upgrading to a version with encryption enabled must not brick a
+    # secret written in plaintext by an older version
+    upgraded = UserStore(path, SecretsCipher("a-secret-key"))
+    assert upgraded.get("alice").totp_secret == "JBSWY3DPEHPK3PXP"

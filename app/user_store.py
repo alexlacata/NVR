@@ -10,6 +10,7 @@ import yaml
 from passlib.context import CryptContext
 
 from app.models import User, UserCreate, UserRole, UserUpdate
+from app.secrets_crypto import SecretsCipher
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -29,8 +30,13 @@ class LastAdminError(ValueError):
 class UserStore:
     """Thread-safe CRUD store for user accounts, persisted as YAML."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, cipher: Optional[SecretsCipher] = None):
         self._path = path
+        # Encrypts totp_secret at rest when a cipher is provided; every
+        # method below reads/writes plain dicts as before - only this
+        # read/write boundary knows about encryption, so a missed spot
+        # elsewhere in the store can't leave a secret unencrypted.
+        self._cipher = cipher
         self._lock = threading.RLock()
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if not self._path.exists():
@@ -41,9 +47,20 @@ class UserStore:
             return {}
         with self._path.open("r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
-        return data.get("users", {})
+        users = data.get("users", {})
+        if self._cipher:
+            for user in users.values():
+                if user.get("totp_secret"):
+                    user["totp_secret"] = self._cipher.decrypt(user["totp_secret"])
+        return users
 
     def _write(self, users: dict[str, dict]) -> None:
+        if self._cipher:
+            users = {
+                key: {**user, "totp_secret": self._cipher.encrypt(user["totp_secret"])}
+                if user.get("totp_secret") else user
+                for key, user in users.items()
+            }
         tmp_path = self._path.with_suffix(".tmp")
         with tmp_path.open("w", encoding="utf-8") as fh:
             yaml.safe_dump({"users": users}, fh, sort_keys=True, allow_unicode=True)

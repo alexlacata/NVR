@@ -38,6 +38,7 @@ from app.ptz_registry import PTZRegistry
 from app.rate_limiter import RateLimiter
 from app.recording_schedule import recording_schedule_loop
 from app.retention import retention_loop
+from app.secrets_crypto import SecretsCipher
 from app.session_store import SessionStore
 from app.settings_store import SettingsStore
 from app.store import CameraStore
@@ -59,9 +60,10 @@ async def lifespan(app: FastAPI):
     app.state.settings_store.apply_to(settings)
 
     app.state.settings = settings
+    secrets_cipher = SecretsCipher(settings.resolve_secret_key())
     app.state.store = CameraStore(settings.cameras_file)
     app.state.systems_store = RemoteSystemStore(settings.systems_file)
-    app.state.user_store = UserStore(settings.users_file)
+    app.state.user_store = UserStore(settings.users_file, secrets_cipher)
     bootstrap_admin(settings, app.state.user_store)
     app.state.session_store = SessionStore(settings.sessions_file)
     app.state.auth_service = AuthService(settings, app.state.user_store, app.state.session_store)
@@ -77,7 +79,9 @@ async def lifespan(app: FastAPI):
     app.state.stream_manager = StreamManager(settings)
     app.state.ptz_registry = PTZRegistry()
     app.state.motion_registry = MotionRegistry(settings.motion_dir)
-    app.state.notification_settings_store = NotificationSettingsStore(settings.notification_settings_file)
+    app.state.notification_settings_store = NotificationSettingsStore(
+        settings.notification_settings_file, secrets_cipher
+    )
     app.state.notifier = Notifier(app.state.notification_settings_store)
     app.state.camera_health_registry = CameraHealthRegistry()
     app.state.audit_log = AuditLog(settings.audit_log_file)
