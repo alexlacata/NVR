@@ -892,6 +892,28 @@ automatique du disque, sauvegarde optionnelle, alertes — voir plus haut) :
   enregistrements doivent servir de preuve dans une procédure formelle,
   renseignez-vous sur les exigences spécifiques applicables (elles varient
   largement selon le contexte).
+- **Enregistrements non chiffrés sur disque** : contrairement au mot de
+  passe SMTP et au secret TOTP (*Chiffrement des secrets stockés*
+  ci-dessus), les fichiers vidéo eux-mêmes (`NVR_DATA_DIR/recordings`,
+  vignettes, HLS) sont écrits en clair. Ce n'est pas un oubli : les
+  chiffrer au niveau applicatif n'apporterait rien ici. Il faudrait de
+  toute façon garder la clé accessible en permanence au processus pour
+  déchiffrer à la demande (relecture, vignettes, purge de rétention,
+  export) — exactement le même compromis que pour le mot de passe SMTP/le
+  secret TOTP, mais sur des fichiers bien plus gros et bien plus souvent
+  lus, pour un coût CPU/IO ajouté à chaque lecture ou écriture sans
+  bénéfice de sécurité supplémentaire par rapport à la bonne réponse à ce
+  problème : le **chiffrement de disque au niveau du système
+  d'exploitation** (LUKS sur Linux, BitLocker sur Windows, FileVault sur
+  macOS), qui protège tout `NVR_DATA_DIR` — enregistrements compris — dans
+  le cas qui compte réellement, le vol physique du disque ou du boîtier
+  éteint, sans toucher au logiciel ni à ses performances pendant qu'il
+  tourne (le disque est déchiffré une fois au démarrage, transparent
+  ensuite). Sur un boîtier qui reste allumé en continu (le cas normal
+  d'un NVR), la protection couvre le scénario "quelqu'un repart avec le
+  disque" ; elle ne protège pas contre un accès à la machine pendant
+  qu'elle tourne, montée et déverrouillée — même limite, déjà mentionnée
+  ci-dessus, que le chiffrement des secrets applicatifs.
 
 ## Tests
 
