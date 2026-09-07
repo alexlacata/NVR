@@ -58,3 +58,19 @@ def provisioning_uri(secret: str, username: str, issuer: str = "NVR") -> str:
         "secret": secret, "issuer": issuer, "algorithm": "SHA1", "digits": _DIGITS, "period": _STEP_SECONDS,
     })
     return f"otpauth://totp/{label}?{params}"
+
+
+# Excludes visually ambiguous characters (0/O, 1/I/L) so a code copied down
+# by hand is less likely to be mistyped.
+_RECOVERY_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def generate_recovery_codes(count: int = 8) -> list[str]:
+    """One-time backup codes for when the authenticator app/device is lost -
+    each is meant to be hashed (like a password) before storage and
+    consumed (deleted) on use, never stored or compared in plaintext."""
+    codes = []
+    for _ in range(count):
+        raw = "".join(secrets.choice(_RECOVERY_ALPHABET) for _ in range(8))
+        codes.append(f"{raw[:4]}-{raw[4:]}")
+    return codes

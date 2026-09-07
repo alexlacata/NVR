@@ -468,7 +468,13 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
   premier code généré — la 2FA ne s'active vraiment qu'une fois ce code
   vérifié, pas dès le scan. Une fois activée, le mot de passe seul ne
   suffit plus à se connecter ; désactiver demande de ressaisir le mot de
-  passe.
+  passe. À la confirmation, **8 codes de secours à usage unique**
+  s'affichent une seule fois (notez-les) : chacun remplace le code de
+  l'application le temps d'une connexion si vous perdez votre téléphone —
+  saisissez-le dans le même champ que le code à 6 chiffres, au format
+  `XXXX-XXXX`. Un compteur indique combien il en reste ; régénérez-les à
+  tout moment (mot de passe requis) pour invalider les anciens et en
+  obtenir une nouvelle série.
 - **Utilisateurs** *(administrateurs uniquement)* : créer des comptes,
   changer le rôle d'un compte (**Administrateur** ou **Lecteur**), supprimer
   un compte, et — pour un compte **Lecteur** — cocher précisément ce qu'il a

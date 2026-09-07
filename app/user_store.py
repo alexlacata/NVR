@@ -138,10 +138,47 @@ class UserStore:
             key = self._key(username)
             if key not in users:
                 raise UserNotFound(username)
-            merged = User(**users[key]).model_copy(update={"totp_secret": secret, "totp_enabled": enabled})
+            updates = {"totp_secret": secret, "totp_enabled": enabled}
+            if not enabled:
+                # Starting a new enrollment or disabling outright both make
+                # any previously issued recovery codes meaningless - a code
+                # for a 2FA setup that no longer exists shouldn't still work.
+                updates["totp_recovery_codes"] = []
+            merged = User(**users[key]).model_copy(update=updates)
             users[key] = merged.model_dump(mode="json")
             self._write(users)
             return merged
+
+    def set_totp_recovery_codes(self, username: str, hashed_codes: list[str]) -> User:
+        with self._lock:
+            users = self._read()
+            key = self._key(username)
+            if key not in users:
+                raise UserNotFound(username)
+            merged = User(**users[key]).model_copy(update={"totp_recovery_codes": hashed_codes})
+            users[key] = merged.model_dump(mode="json")
+            self._write(users)
+            return merged
+
+    def try_consume_recovery_code(self, username: str, code: str) -> bool:
+        """Checks `code` against the account's remaining hashed recovery
+        codes; if one matches, removes it (single-use) and returns True.
+        Done under the store's lock so a code can't be raced into being
+        used twice concurrently."""
+        with self._lock:
+            users = self._read()
+            key = self._key(username)
+            if key not in users:
+                return False
+            user = User(**users[key])
+            for hashed in user.totp_recovery_codes:
+                if pwd_context.verify(code, hashed):
+                    remaining = [h for h in user.totp_recovery_codes if h != hashed]
+                    merged = user.model_copy(update={"totp_recovery_codes": remaining})
+                    users[key] = merged.model_dump(mode="json")
+                    self._write(users)
+                    return True
+            return False
 
     def delete(self, username: str) -> None:
         with self._lock:

@@ -1,4 +1,4 @@
-from app.totp import generate_secret, provisioning_uri, totp_now, verify_totp
+from app.totp import generate_recovery_codes, generate_secret, provisioning_uri, totp_now, verify_totp
 
 
 def test_generate_secret_is_base32_and_random():
@@ -60,3 +60,25 @@ def test_provisioning_uri_contains_secret_and_username():
     assert uri.startswith("otpauth://totp/")
     assert secret in uri
     assert "alice" in uri
+
+
+def test_generate_recovery_codes_count_and_format():
+    codes = generate_recovery_codes()
+    assert len(codes) == 8
+    for code in codes:
+        assert len(code) == 9
+        assert code[4] == "-"
+        assert code.replace("-", "").isalnum()
+        # no ambiguous characters
+        assert not any(c in code for c in "01OIL")
+
+
+def test_generate_recovery_codes_are_unique_and_random():
+    codes_a = generate_recovery_codes()
+    codes_b = generate_recovery_codes()
+    assert set(codes_a).isdisjoint(codes_b)
+    assert len(set(codes_a)) == len(codes_a)
+
+
+def test_generate_recovery_codes_custom_count():
+    assert len(generate_recovery_codes(count=3)) == 3

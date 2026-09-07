@@ -64,9 +64,22 @@
       </div>
     </div>
 
+    <div id="totp-recovery-codes-panel" hidden style="margin-top:14px">
+      <p class="hint" style="margin-top:0"><strong>Notez ces codes de secours maintenant</strong> - ils ne seront plus jamais affiches. Chacun permet de se connecter une seule fois si vous perdez l'acces a votre application d'authentification.</p>
+      <pre id="totp-recovery-codes-text" class="hint tabular" style="background:var(--bg-alt,#0000001a);padding:12px;border-radius:8px;white-space:pre-wrap"></pre>
+      <button type="button" class="btn secondary" id="btn-totp-codes-copy">Copier les codes</button>
+      <button type="button" class="btn" id="btn-totp-codes-done">J'ai note mes codes</button>
+    </div>
+
     <div id="totp-enabled-section" hidden>
       <p class="hint">La double authentification est active sur ce compte.</p>
-      <form class="form-grid" id="totp-disable-form">
+      <p class="hint" id="totp-recovery-remaining"></p>
+      <form class="form-grid" id="totp-regenerate-form">
+        <div><label>Mot de passe (pour regenerer les codes de secours)</label><input type="password" id="totp-regenerate-password" autocomplete="current-password"></div>
+        <div class="error-msg" id="totp-regenerate-error"></div>
+        <div><button type="submit" class="btn secondary">Regenerer les codes de secours</button></div>
+      </form>
+      <form class="form-grid" id="totp-disable-form" style="margin-top:14px">
         <div><label>Mot de passe (pour desactiver)</label><input type="password" id="totp-disable-password" autocomplete="current-password"></div>
         <div class="error-msg" id="totp-disable-error"></div>
         <div><button type="submit" class="btn secondary">Desactiver la double authentification</button></div>
@@ -362,6 +375,11 @@ document.getElementById("password-form").addEventListener("submit", async (ev) =
   }
 });
 
+function showRecoveryCodes(codes) {
+  document.getElementById("totp-recovery-codes-text").textContent = codes.join("\n");
+  document.getElementById("totp-recovery-codes-panel").hidden = false;
+}
+
 async function loadTotpStatus() {
   const me = await apiJson("/api/auth/me");
   document.getElementById("totp-status").textContent = me.totp_enabled
@@ -370,6 +388,10 @@ async function loadTotpStatus() {
   document.getElementById("totp-disabled-section").hidden = me.totp_enabled;
   document.getElementById("totp-enabled-section").hidden = !me.totp_enabled;
   document.getElementById("totp-enroll-panel").hidden = true;
+  if (me.totp_enabled) {
+    document.getElementById("totp-recovery-remaining").textContent =
+      `${me.totp_recovery_codes_remaining} code(s) de secours restant(s).`;
+  }
 }
 
 document.getElementById("btn-totp-start").addEventListener("click", async () => {
@@ -397,12 +419,46 @@ document.getElementById("totp-confirm-form").addEventListener("submit", async (e
   const errorEl = document.getElementById("totp-confirm-error");
   errorEl.textContent = "";
   try {
-    await apiJson("/api/auth/totp/confirm", {
+    const data = await apiJson("/api/auth/totp/confirm", {
       method: "POST",
       body: JSON.stringify({ code: document.getElementById("totp-confirm-code").value }),
     });
     toast("Double authentification activee");
     await loadTotpStatus();
+    showRecoveryCodes(data.recovery_codes);
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
+document.getElementById("btn-totp-codes-copy").addEventListener("click", async () => {
+  const text = document.getElementById("totp-recovery-codes-text").textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Codes copies dans le presse-papiers");
+  } catch (e) {
+    prompt("Codes de secours (Ctrl+C pour copier) :", text);
+  }
+});
+
+document.getElementById("btn-totp-codes-done").addEventListener("click", () => {
+  document.getElementById("totp-recovery-codes-panel").hidden = true;
+  document.getElementById("totp-recovery-codes-text").textContent = "";
+});
+
+document.getElementById("totp-regenerate-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("totp-regenerate-error");
+  errorEl.textContent = "";
+  try {
+    const data = await apiJson("/api/auth/totp/recovery-codes/regenerate", {
+      method: "POST",
+      body: JSON.stringify({ password: document.getElementById("totp-regenerate-password").value }),
+    });
+    document.getElementById("totp-regenerate-form").reset();
+    toast("Codes de secours regeneres");
+    await loadTotpStatus();
+    showRecoveryCodes(data.recovery_codes);
   } catch (e) {
     errorEl.textContent = e.message;
   }

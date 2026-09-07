@@ -304,6 +304,9 @@ class User(UserBase):
     # account.
     totp_secret: Optional[str] = None
     totp_enabled: bool = False
+    # Hashed (passlib, like password_hash) one-time backup codes - never
+    # stored or compared in plaintext. Consumed (removed) on use.
+    totp_recovery_codes: list[str] = Field(default_factory=list)
 
 
 class UserPublic(UserBase):

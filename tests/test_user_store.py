@@ -95,3 +95,44 @@ def test_count_admins(store):
     store.create(UserCreate(username="alice", password="s3cretpass", role=UserRole.admin))
     store.create(UserCreate(username="bob", password="s3cretpass", role=UserRole.viewer))
     assert store.count_admins() == 1
+
+
+def test_set_totp_enables_and_disables(store):
+    store.create(UserCreate(username="alice", password="s3cretpass"))
+    updated = store.set_totp("alice", secret="ABCDEF", enabled=True)
+    assert updated.totp_secret == "ABCDEF"
+    assert updated.totp_enabled is True
+
+    disabled = store.set_totp("alice", secret=None, enabled=False)
+    assert disabled.totp_secret is None
+    assert disabled.totp_enabled is False
+
+
+def test_set_totp_disabling_clears_recovery_codes(store):
+    store.create(UserCreate(username="alice", password="s3cretpass"))
+    store.set_totp("alice", secret="ABCDEF", enabled=True)
+    store.set_totp_recovery_codes("alice", [pwd_context.hash("AAAA-BBBB")])
+    assert len(store.get("alice").totp_recovery_codes) == 1
+
+    store.set_totp("alice", secret=None, enabled=False)
+    assert store.get("alice").totp_recovery_codes == []
+
+
+def test_try_consume_recovery_code_matches_and_removes(store):
+    store.create(UserCreate(username="alice", password="s3cretpass"))
+    store.set_totp_recovery_codes("alice", [pwd_context.hash("AAAA-BBBB"), pwd_context.hash("CCCC-DDDD")])
+
+    assert store.try_consume_recovery_code("alice", "AAAA-BBBB") is True
+    assert len(store.get("alice").totp_recovery_codes) == 1
+    # already consumed - can't be used again
+    assert store.try_consume_recovery_code("alice", "AAAA-BBBB") is False
+    # the other code is untouched
+    assert store.try_consume_recovery_code("alice", "CCCC-DDDD") is True
+    assert store.get("alice").totp_recovery_codes == []
+
+
+def test_try_consume_recovery_code_wrong_code_or_user(store):
+    store.create(UserCreate(username="alice", password="s3cretpass"))
+    store.set_totp_recovery_codes("alice", [pwd_context.hash("AAAA-BBBB")])
+    assert store.try_consume_recovery_code("alice", "ZZZZ-ZZZZ") is False
+    assert store.try_consume_recovery_code("nobody", "AAAA-BBBB") is False

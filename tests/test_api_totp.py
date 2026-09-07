@@ -127,6 +127,123 @@ async def test_disabling_totp_removes_login_requirement(client):
 
 
 @pytest.mark.asyncio
+async def test_confirm_returns_recovery_codes(client):
+    await _login_admin(client)
+    secret = (await client.post("/api/auth/totp/enroll")).json()["secret"]
+    resp = await client.post("/api/auth/totp/confirm", json={"code": totp_now(secret)})
+    data = resp.json()
+    assert len(data["recovery_codes"]) == 8
+    for code in data["recovery_codes"]:
+        assert len(code) == 9  # "XXXX-XXXX"
+        assert code[4] == "-"
+    assert len(set(data["recovery_codes"])) == 8  # all distinct
+
+
+@pytest.mark.asyncio
+async def test_login_with_recovery_code_succeeds_and_consumes_it(client):
+    await _login_admin(client)
+    secret = (await client.post("/api/auth/totp/enroll")).json()["secret"]
+    codes = (await client.post("/api/auth/totp/confirm", json={"code": totp_now(secret)})).json()["recovery_codes"]
+    await client.post("/api/auth/logout")
+
+    code = codes[0]
+    resp = await client.post("/api/auth/login", json={
+        "username": "admin", "password": "s3cret-pass", "totp_code": code,
+    })
+    assert resp.status_code == 200
+
+    # the same code cannot be reused
+    await client.post("/api/auth/logout")
+    resp2 = await client.post("/api/auth/login", json={
+        "username": "admin", "password": "s3cret-pass", "totp_code": code,
+    })
+    assert resp2.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_with_recovery_code_counts_remaining(client):
+    await _login_admin(client)
+    secret = (await client.post("/api/auth/totp/enroll")).json()["secret"]
+    codes = (await client.post("/api/auth/totp/confirm", json={"code": totp_now(secret)})).json()["recovery_codes"]
+
+    me = (await client.get("/api/auth/me")).json()
+    assert me["totp_recovery_codes_remaining"] == 8
+
+    await client.post("/api/auth/logout")
+    await client.post("/api/auth/login", json={
+        "username": "admin", "password": "s3cret-pass", "totp_code": codes[0],
+    })
+    me2 = (await client.get("/api/auth/me")).json()
+    assert me2["totp_recovery_codes_remaining"] == 7
+
+
+@pytest.mark.asyncio
+async def test_malformed_recovery_code_is_rejected(client):
+    await _login_admin(client)
+    secret = (await client.post("/api/auth/totp/enroll")).json()["secret"]
+    await client.post("/api/auth/totp/confirm", json={"code": totp_now(secret)})
+    await client.post("/api/auth/logout")
+
+    resp = await client.post("/api/auth/login", json={
+        "username": "admin", "password": "s3cret-pass", "totp_code": "ZZZZ-ZZZZ",
+    })
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_disabling_totp_clears_recovery_codes(client):
+    await _login_admin(client)
+    secret = (await client.post("/api/auth/totp/enroll")).json()["secret"]
+    codes = (await client.post("/api/auth/totp/confirm", json={"code": totp_now(secret)})).json()["recovery_codes"]
+    await client.post("/api/auth/totp/disable", json={"password": "s3cret-pass"})
+
+    # re-enroll from scratch with a new secret
+    secret2 = (await client.post("/api/auth/totp/enroll")).json()["secret"]
+    await client.post("/api/auth/totp/confirm", json={"code": totp_now(secret2)})
+    await client.post("/api/auth/logout")
+
+    # an old recovery code from before the disable/re-enroll no longer works
+    resp = await client.post("/api/auth/login", json={
+        "username": "admin", "password": "s3cret-pass", "totp_code": codes[0],
+    })
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_regenerate_recovery_codes_invalidates_old_ones(client):
+    await _login_admin(client)
+    secret = (await client.post("/api/auth/totp/enroll")).json()["secret"]
+    old_codes = (await client.post("/api/auth/totp/confirm", json={"code": totp_now(secret)})).json()["recovery_codes"]
+
+    resp = await client.post("/api/auth/totp/recovery-codes/regenerate", json={"password": "wrong"})
+    assert resp.status_code == 403
+
+    resp2 = await client.post("/api/auth/totp/recovery-codes/regenerate", json={"password": "s3cret-pass"})
+    assert resp2.status_code == 200
+    new_codes = resp2.json()["recovery_codes"]
+    assert len(new_codes) == 8
+    assert set(new_codes).isdisjoint(old_codes)
+
+    await client.post("/api/auth/logout")
+    resp3 = await client.post("/api/auth/login", json={
+        "username": "admin", "password": "s3cret-pass", "totp_code": old_codes[0],
+    })
+    assert resp3.status_code == 401
+
+    resp4 = await client.post("/api/auth/login", json={
+        "username": "admin", "password": "s3cret-pass", "totp_code": new_codes[0],
+    })
+    assert resp4.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_regenerate_requires_totp_enabled(client):
+    await _login_admin(client)
+    resp = await client.post("/api/auth/totp/recovery-codes/regenerate", json={"password": "s3cret-pass"})
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_user_list_shows_totp_status(client):
     await _login_admin(client)
     secret = (await client.post("/api/auth/totp/enroll")).json()["secret"]

@@ -11,7 +11,7 @@ from app.config import Settings
 from app.deps import get_auth_service, get_login_throttle, get_settings, get_user_store, require_auth
 from app.login_throttle import LoginThrottle
 from app.models import PasswordChange, User, effective_permissions
-from app.totp import generate_secret, provisioning_uri, verify_totp
+from app.totp import generate_recovery_codes, generate_secret, provisioning_uri, verify_totp
 from app.user_store import UserStore, pwd_context
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -41,6 +41,19 @@ class TotpDisableRequest(BaseModel):
     password: str
 
 
+class TotpConfirmResponse(BaseModel):
+    ok: bool
+    recovery_codes: list[str]
+
+
+class RecoveryCodesResponse(BaseModel):
+    recovery_codes: list[str]
+
+
+class RegenerateRecoveryCodesRequest(BaseModel):
+    password: str
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(
     payload: LoginRequest,
@@ -48,6 +61,7 @@ def login(
     auth_service: AuthService = Depends(get_auth_service),
     settings: Settings = Depends(get_settings),
     throttle: LoginThrottle = Depends(get_login_throttle),
+    users: UserStore = Depends(get_user_store),
 ):
     wait = throttle.seconds_until_unlocked(payload.username)
     if wait > 0:
@@ -70,7 +84,13 @@ def login(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"detail": "Code de verification a deux facteurs requis", "totp_required": True},
             )
-        if not verify_totp(user.totp_secret, payload.totp_code):
+        # A code that isn't a valid TOTP right now might still be a
+        # recovery code (format "XXXX-XXXX" vs. 6 digits) - try that before
+        # failing, since losing the authenticator app is exactly the case
+        # recovery codes exist for.
+        if not verify_totp(user.totp_secret, payload.totp_code) and not users.try_consume_recovery_code(
+            user.username, payload.totp_code.strip()
+        ):
             throttle.record_failure(payload.username)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code de verification incorrect")
     throttle.record_success(payload.username)
@@ -101,6 +121,7 @@ def me(user: User = Depends(require_auth)):
         "role": user.role,
         "permissions": sorted(p.value for p in effective_permissions(user)),
         "totp_enabled": user.totp_enabled,
+        "totp_recovery_codes_remaining": len(user.totp_recovery_codes),
     }
 
 
@@ -132,7 +153,7 @@ def enroll_totp(user: User = Depends(require_auth), users: UserStore = Depends(g
     return TotpEnrollResponse(secret=secret, otpauth_uri=provisioning_uri(secret, user.username))
 
 
-@router.post("/totp/confirm")
+@router.post("/totp/confirm", response_model=TotpConfirmResponse)
 def confirm_totp(
     payload: TotpConfirmRequest,
     user: User = Depends(require_auth),
@@ -144,7 +165,29 @@ def confirm_totp(
     if not verify_totp(fresh.totp_secret, payload.code):
         raise HTTPException(status_code=400, detail="Code incorrect")
     users.set_totp(user.username, secret=fresh.totp_secret, enabled=True)
-    return {"ok": True}
+    codes = generate_recovery_codes()
+    users.set_totp_recovery_codes(user.username, [pwd_context.hash(c) for c in codes])
+    return TotpConfirmResponse(ok=True, recovery_codes=codes)
+
+
+@router.post("/totp/recovery-codes/regenerate", response_model=RecoveryCodesResponse)
+def regenerate_recovery_codes(
+    payload: RegenerateRecoveryCodesRequest,
+    user: User = Depends(require_auth),
+    users: UserStore = Depends(get_user_store),
+):
+    """Invalidates all existing recovery codes and issues a fresh set -
+    for after using one, or if you suspect the old ones leaked. Requires
+    the current password since, like disabling 2FA, this changes what can
+    get into the account."""
+    if not pwd_context.verify(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mot de passe incorrect")
+    fresh = users.get(user.username)
+    if not fresh.totp_enabled:
+        raise HTTPException(status_code=400, detail="La double authentification n'est pas activee")
+    codes = generate_recovery_codes()
+    users.set_totp_recovery_codes(user.username, [pwd_context.hash(c) for c in codes])
+    return RecoveryCodesResponse(recovery_codes=codes)
 
 
 @router.post("/totp/disable")
