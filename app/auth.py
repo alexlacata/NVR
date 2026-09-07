@@ -83,3 +83,11 @@ class AuthService:
     def session_id_from_token(self, token: str) -> Optional[str]:
         data = self._decode(token)
         return data.get("jti") if data else None
+
+    def username_from_token(self, token: str) -> Optional[str]:
+        """Cheap identity lookup for the rate limiter - just the signed
+        claim, no user-store hit or revocation check (verify_token does
+        that already, redundantly checking it here isn't worth the cost
+        just to pick a rate-limit bucket)."""
+        data = self._decode(token)
+        return data.get("sub") if data else None

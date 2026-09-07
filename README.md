@@ -569,6 +569,21 @@ pouvoir retenter — même avec le bon mot de passe. Réglable via
 appareils derrière la même IP partagée (4G, routeur familial) ne se
 bloquent pas mutuellement.
 
+**Limitation de débit générale de l'API** : au-delà de la protection
+anti-bruteforce ci-dessus (spécifique à la connexion), toutes les routes
+`/api/*` sont plafonnées à 120 requêtes par minute et par identité — le
+compte connecté une fois authentifié, sinon l'adresse IP (typiquement pour
+la requête de connexion elle-même). Au-delà, l'API répond `429 Too Many
+Requests` avec un en-tête `Retry-After` indiquant dans combien de secondes
+retenter. Réglable via `NVR_RATE_LIMIT_MAX_REQUESTS`/
+`NVR_RATE_LIMIT_WINDOW_SECONDS`. Comme pour le blocage de connexion, la
+limite par compte (plutôt que par IP une fois connecté) évite qu'un
+partage d'IP (4G, routeur familial) ne pénalise tout le monde derrière —
+et empêche à l'inverse qu'un compte compromis ou un client buggé ne
+martèle une route (téléchargements en boucle, appels PTZ répétés...) sans
+affecter les autres comptes. Les fichiers statiques (interface web,
+vignettes) ne sont pas concernés — seule l'API l'est.
+
 ## HTTPS
 
 Par défaut, le serveur ne parle que HTTP en clair - mots de passe et flux
@@ -742,6 +757,8 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_LOGIN_MAX_ATTEMPTS` | `5` | Nombre d'échecs de connexion tolérés pour un même compte avant blocage temporaire (anti-bruteforce) |
 | `NVR_LOGIN_ATTEMPT_WINDOW_SECONDS` | `300` | Fenêtre de temps sur laquelle les échecs sont comptés |
 | `NVR_LOGIN_LOCKOUT_SECONDS` | `300` | Durée du blocage une fois le seuil atteint |
+| `NVR_RATE_LIMIT_MAX_REQUESTS` | `120` | Nombre max de requêtes API par identité (compte, sinon IP) dans la fenêtre ci-dessous, au-delà des routes de connexion |
+| `NVR_RATE_LIMIT_WINDOW_SECONDS` | `60` | Fenêtre de temps de la limitation de débit générale de l'API |
 | `NVR_SEGMENT_SECONDS` | `600` | Durée d'un fichier d'enregistrement (secondes) — modifiable aussi depuis **Paramètres** |
 | `NVR_RETENTION_DAYS` | `14` | Suppression des enregistrements plus vieux que N jours — idem |
 | `NVR_MIN_FREE_DISK_PERCENT` | `10` | Purge des plus anciens enregistrements sous ce seuil d'espace libre — idem |

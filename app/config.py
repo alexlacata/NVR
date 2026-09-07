@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     login_attempt_window_seconds: int = 300
     login_lockout_seconds: int = 300
 
+    # General API rate limiting: beyond the login-specific anti-bruteforce
+    # above, caps how many requests any single identity (the authenticated
+    # username, or the client IP before login) can make to the API within
+    # rate_limit_window_seconds, so no one endpoint can be hammered.
+    rate_limit_max_requests: int = 120
+    rate_limit_window_seconds: int = 60
+
     # Recording / retention
     segment_seconds: int = 600  # length of each recorded file (10 min)
     retention_days: int = 14  # delete recordings older than this

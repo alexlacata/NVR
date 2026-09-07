@@ -5,7 +5,8 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (
@@ -24,7 +25,7 @@ from app.api import (
     routes_users,
 )
 from app.audit_log import AuditLog
-from app.auth import AuthService, bootstrap_admin
+from app.auth import COOKIE_NAME, AuthService, bootstrap_admin
 from app.backup import BackupStatusTracker, backup_loop
 from app.camera_health import CameraHealthRegistry, camera_health_loop
 from app.config import get_settings
@@ -34,6 +35,7 @@ from app.motion import MotionRegistry, motion_loop
 from app.notification_settings_store import NotificationSettingsStore
 from app.notifier import Notifier
 from app.ptz_registry import PTZRegistry
+from app.rate_limiter import RateLimiter
 from app.recording_schedule import recording_schedule_loop
 from app.retention import retention_loop
 from app.session_store import SessionStore
@@ -67,6 +69,10 @@ async def lifespan(app: FastAPI):
         max_attempts=settings.login_max_attempts,
         window_seconds=settings.login_attempt_window_seconds,
         lockout_seconds=settings.login_lockout_seconds,
+    )
+    app.state.rate_limiter = RateLimiter(
+        max_requests=settings.rate_limit_max_requests,
+        window_seconds=settings.rate_limit_window_seconds,
     )
     app.state.stream_manager = StreamManager(settings)
     app.state.ptz_registry = PTZRegistry()
@@ -118,6 +124,37 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="NVR", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        # Only the API needs this - static assets (UI, thumbnails via
+        # nginx-like StaticFiles) are cheap and legitimately fetched in
+        # bursts by a single page load.
+        if request.url.path.startswith("/api/"):
+            limiter: RateLimiter = request.app.state.rate_limiter
+            auth_service: AuthService = request.app.state.auth_service
+            token = request.cookies.get(COOKIE_NAME)
+            if not token:
+                authorization = request.headers.get("authorization", "")
+                if authorization.lower().startswith("bearer "):
+                    token = authorization[7:]
+            # Keyed by account once authenticated (so one user's several
+            # devices/tabs share one budget, and one IP shared by many
+            # viewers behind NAT/4G doesn't throttle them as a group);
+            # falls back to IP for anonymous requests (e.g. login itself).
+            username = auth_service.username_from_token(token) if token else None
+            if username:
+                key = f"user:{username.lower()}"
+            else:
+                key = f"ip:{request.client.host if request.client else 'unknown'}"
+            allowed, retry_after = limiter.allow(key)
+            if not allowed:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Trop de requetes, veuillez ralentir."},
+                    headers={"Retry-After": str(int(retry_after) + 1)},
+                )
+        return await call_next(request)
 
     app.include_router(routes_auth.router)
     app.include_router(routes_cameras.router)
