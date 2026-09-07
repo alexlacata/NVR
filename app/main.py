@@ -36,6 +36,7 @@ from app.notifier import Notifier
 from app.ptz_registry import PTZRegistry
 from app.recording_schedule import recording_schedule_loop
 from app.retention import retention_loop
+from app.session_store import SessionStore
 from app.settings_store import SettingsStore
 from app.store import CameraStore
 from app.systems_store import RemoteSystemStore
@@ -60,7 +61,8 @@ async def lifespan(app: FastAPI):
     app.state.systems_store = RemoteSystemStore(settings.systems_file)
     app.state.user_store = UserStore(settings.users_file)
     bootstrap_admin(settings, app.state.user_store)
-    app.state.auth_service = AuthService(settings, app.state.user_store)
+    app.state.session_store = SessionStore(settings.sessions_file)
+    app.state.auth_service = AuthService(settings, app.state.user_store, app.state.session_store)
     app.state.login_throttle = LoginThrottle(
         max_attempts=settings.login_max_attempts,
         window_seconds=settings.login_attempt_window_seconds,

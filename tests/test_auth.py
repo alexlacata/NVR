@@ -1,6 +1,7 @@
 from app.auth import AuthService, bootstrap_admin
 from app.config import Settings
 from app.models import UserRole
+from app.session_store import SessionStore
 from app.user_store import UserStore
 
 
@@ -97,3 +98,61 @@ def test_verify_token_deleted_user_no_longer_valid(tmp_path):
     assert auth.verify_token(token) is not None
     users.delete("temp")
     assert auth.verify_token(token) is None
+
+
+def test_create_token_records_a_session(tmp_path):
+    settings = _settings(tmp_path)
+    users = UserStore(tmp_path / "users.yaml")
+    bootstrap_admin(settings, users)
+    sessions = SessionStore(tmp_path / "sessions.yaml")
+    auth = AuthService(settings, users, sessions)
+
+    auth.create_token("admin", user_agent="TestBrowser/1.0", ip="127.0.0.1")
+    entries = sessions.list_for_user("admin")
+    assert len(entries) == 1
+    assert entries[0]["user_agent"] == "TestBrowser/1.0"
+    assert entries[0]["ip"] == "127.0.0.1"
+
+
+def test_revoked_session_invalidates_its_token(tmp_path):
+    settings = _settings(tmp_path)
+    users = UserStore(tmp_path / "users.yaml")
+    bootstrap_admin(settings, users)
+    sessions = SessionStore(tmp_path / "sessions.yaml")
+    auth = AuthService(settings, users, sessions)
+
+    token = auth.create_token("admin")
+    assert auth.verify_token(token) is not None
+
+    jti = auth.session_id_from_token(token)
+    sessions.revoke(jti)
+    assert auth.verify_token(token) is None
+
+
+def test_token_without_jti_is_still_valid_for_backward_compat(tmp_path):
+    """Tokens issued before session tracking existed carry no "jti" claim -
+    they must keep working (until they naturally expire) rather than
+    forcing every logged-in user to re-authenticate the moment this
+    feature ships."""
+    settings = _settings(tmp_path)
+    users = UserStore(tmp_path / "users.yaml")
+    bootstrap_admin(settings, users)
+    sessions = SessionStore(tmp_path / "sessions.yaml")
+    auth = AuthService(settings, users, sessions)
+
+    old_style_token = auth._serializer.dumps({"sub": "admin"})  # no jti
+    assert auth.verify_token(old_style_token) is not None
+
+
+def test_session_id_from_token(tmp_path):
+    settings = _settings(tmp_path)
+    users = UserStore(tmp_path / "users.yaml")
+    bootstrap_admin(settings, users)
+    sessions = SessionStore(tmp_path / "sessions.yaml")
+    auth = AuthService(settings, users, sessions)
+
+    token = auth.create_token("admin")
+    jti = auth.session_id_from_token(token)
+    assert jti is not None
+    assert sessions.exists(jti)
+    assert auth.session_id_from_token("garbage") is None

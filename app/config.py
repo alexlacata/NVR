@@ -130,6 +130,10 @@ class Settings(BaseSettings):
         return self.config_dir / "audit.jsonl"
 
     @property
+    def sessions_file(self) -> Path:
+        return self.config_dir / "sessions.yaml"
+
+    @property
     def recordings_dir(self) -> Path:
         return self.data_dir / "recordings"
 

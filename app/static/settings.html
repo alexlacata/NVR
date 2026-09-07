@@ -41,6 +41,12 @@
     </form>
   </div>
 
+  <div class="section-title">Sessions actives</div>
+  <div class="card" style="padding:16px 18px">
+    <p class="hint" style="margin-top:0">Les appareils/navigateurs actuellement connectes avec votre compte. Revoquer une session en deconnecte l'appareil correspondant immediatement, sans changer votre mot de passe.</p>
+    <div id="sessions-list" class="rec-list"></div>
+  </div>
+
   <div class="section-title">Double authentification (2FA)</div>
   <div class="card" style="padding:16px 18px">
     <p class="hint" id="totp-status" style="margin-top:0"></p>
@@ -369,7 +375,8 @@ document.getElementById("password-form").addEventListener("submit", async (ev) =
       }),
     });
     document.getElementById("password-form").reset();
-    toast("Mot de passe modifie");
+    toast("Mot de passe modifie - les autres sessions ont ete deconnectees");
+    await loadSessions();
   } catch (e) {
     errorEl.textContent = e.message;
   }
@@ -378,6 +385,42 @@ document.getElementById("password-form").addEventListener("submit", async (ev) =
 function showRecoveryCodes(codes) {
   document.getElementById("totp-recovery-codes-text").textContent = codes.join("\n");
   document.getElementById("totp-recovery-codes-panel").hidden = false;
+}
+
+function fmtSessionDate(iso) {
+  try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+}
+
+async function loadSessions() {
+  const listEl = document.getElementById("sessions-list");
+  listEl.innerHTML = '<div class="spinner-row">Chargement...</div>';
+  const sessions = await apiJson("/api/auth/sessions");
+  listEl.innerHTML = "";
+  sessions.forEach((s) => {
+    const revokeBtn = s.current ? null : el("button", {
+      class: "icon-btn del",
+      title: "Revoquer cette session",
+      onclick: async () => {
+        try {
+          await apiJson(`/api/auth/sessions/${encodeURIComponent(s.jti)}`, { method: "DELETE" });
+          toast("Session revoquee");
+          await loadSessions();
+        } catch (e) {
+          toast(e.message);
+        }
+      },
+    }, "🗑");
+    listEl.appendChild(el("div", { class: "rec-item" }, [
+      el("div", { style: "min-width:0" }, [
+        el("div", {}, [
+          s.current ? el("strong", {}, "Cette session") : document.createTextNode(s.ip || "IP inconnue"),
+        ]),
+        el("div", { class: "hint", style: "margin-top:2px;word-break:break-all" }, s.user_agent || "Agent inconnu"),
+        el("div", { class: "hint", style: "margin-top:2px" }, `Connecte le ${fmtSessionDate(s.created_at)}`),
+      ]),
+      el("div", { class: "rec-actions" }, [revokeBtn]),
+    ]));
+  });
 }
 
 async function loadTotpStatus() {
@@ -618,6 +661,7 @@ document.getElementById("btn-backup-run").addEventListener("click", async () => 
   renderAccessQrCode();
   document.getElementById("whoami").textContent =
     `Connecte en tant que ${currentUser.username} (${currentUser.role === "admin" ? "administrateur" : "lecteur"}).`;
+  await loadSessions();
   await loadTotpStatus();
   if (isAdmin()) {
     document.getElementById("admin-only-section").hidden = false;

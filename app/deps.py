@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import HTTPException, Request, status
 
 from app.audit_log import AuditLog
@@ -13,6 +15,7 @@ from app.motion import MotionRegistry
 from app.notification_settings_store import NotificationSettingsStore
 from app.notifier import Notifier
 from app.ptz_registry import PTZRegistry
+from app.session_store import SessionStore
 from app.settings_store import SettingsStore
 from app.store import CameraStore
 from app.systems_store import RemoteSystemStore
@@ -75,17 +78,35 @@ def get_backup_status(request: Request) -> BackupStatusTracker:
     return request.app.state.backup_status
 
 
-def require_auth(request: Request) -> User:
-    auth_service: AuthService = request.app.state.auth_service
+def get_session_store(request: Request) -> SessionStore:
+    return request.app.state.session_store
+
+
+def _extract_token(request: Request) -> Optional[str]:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         authorization = request.headers.get("authorization", "")
         if authorization.lower().startswith("bearer "):
             token = authorization[7:]
+    return token
+
+
+def require_auth(request: Request) -> User:
+    auth_service: AuthService = request.app.state.auth_service
+    token = _extract_token(request)
     user = auth_service.verify_token(token) if token else None
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise")
     return user
+
+
+def get_current_jti(request: Request) -> Optional[str]:
+    """The session id embedded in the caller's own token, if any - used to
+    mark "this is the session you're using right now" in the sessions
+    list, and to revoke exactly that one on logout."""
+    auth_service: AuthService = request.app.state.auth_service
+    token = _extract_token(request)
+    return auth_service.session_id_from_token(token) if token else None
 
 
 def require_admin(request: Request) -> User:

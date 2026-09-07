@@ -544,6 +544,23 @@ de passe oublié » par e-mail : ce NVR n'a pas d'adresse e-mail par compte,
 et un accès serveur est de toute façon le seul recours crédible pour un
 logiciel auto-hébergé à instance unique.
 
+**Sessions actives** : la page **Paramètres** liste, pour le compte
+connecté, tous les appareils/navigateurs actuellement authentifiés
+(navigateur, adresse IP, date de connexion), avec la session en cours
+signalée comme telle. Chaque session peut être révoquée individuellement
+(icône 🗑) — utile pour couper l'accès à un appareil perdu ou prêté sans
+changer son propre mot de passe. La révocation est immédiate et côté
+serveur : le jeton de la session visée cesse de fonctionner dès la requête
+suivante, ce n'est pas un simple effacement de cookie local. La
+déconnexion (`Déconnexion`) révoque de la même façon la session en cours.
+Par sécurité, changer son mot de passe révoque automatiquement toutes les
+*autres* sessions du compte (celle qui effectue le changement reste
+active) : un mot de passe est souvent changé après une suspicion de
+compromission, et laisser d'anciennes sessions valides irait à l'encontre
+de cette réaction. Les jetons émis avant l'ajout de cette fonctionnalité
+restent valables jusqu'à leur expiration naturelle plutôt que de forcer
+une reconnexion de tout le monde au déploiement.
+
 **Protection anti-bruteforce** : après 5 échecs de connexion consécutifs sur
 un même compte (en 5 minutes), ce compte est bloqué 5 minutes avant de
 pouvoir retenter — même avec le bon mot de passe. Réglable via
