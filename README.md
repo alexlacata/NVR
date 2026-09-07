@@ -523,6 +523,27 @@ n'existe encore) ; une fois ce compte créé, ces variables n'ont plus aucun
 effet et la gestion des comptes se fait entièrement depuis la page
 **Paramètres**.
 
+**Plus aucun accès administrateur (mot de passe oublié + 2FA/codes de
+secours perdus)** : sans accès admin, personne ne peut réinitialiser un
+compte depuis l'interface web. `scripts/account-recovery.py` répare ça
+directement sur le fichier de comptes, avec un accès au serveur (ou au
+disque de données) :
+
+```bash
+export NVR_DATA_DIR=/mnt/disque-nvr   # meme valeur que pour le serveur
+python scripts/account-recovery.py list                        # lister les comptes
+python scripts/account-recovery.py reset-password admin        # reinitialiser un mot de passe
+python scripts/account-recovery.py disable-2fa admin           # en cas de telephone + codes de secours perdus
+python scripts/account-recovery.py set-role alice admin        # promouvoir un compte
+```
+
+Arrêtez le serveur avant si possible (deux processus qui écrivent le même
+fichier en même temps est à éviter, même si les écritures sont atomiques).
+Ce script est volontairement une commande hors ligne plutôt qu'un flux « mot
+de passe oublié » par e-mail : ce NVR n'a pas d'adresse e-mail par compte,
+et un accès serveur est de toute façon le seul recours crédible pour un
+logiciel auto-hébergé à instance unique.
+
 **Protection anti-bruteforce** : après 5 échecs de connexion consécutifs sur
 un même compte (en 5 minutes), ce compte est bloqué 5 minutes avant de
 pouvoir retenter — même avec le bon mot de passe. Réglable via
