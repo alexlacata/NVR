@@ -295,6 +295,34 @@ Dans le formulaire d'ajout (et sur la page de chaque caméra), dépliez
 Le PTZ et la limite de bande passante du direct se configurent ensuite sur
 la page de la caméra (section *Bande passante du direct* et *PTZ*).
 
+### Accès direct à l'interface de la caméra et du routeur
+
+Sur le tableau de bord, chaque vignette de caméra affiche deux petits
+liens sous son nom : **📷 &lt;adresse IP&gt;** et **📡 Routeur**. Ils
+ouvrent, dans un nouvel onglet, l'interface web native de la caméra
+(`http://<ip-camera>/`) et celle présumée du routeur (`http://<ip>.1/` —
+la convention classique du ".1" de la passerelle du même sous-réseau que
+la caméra). Adresse et convention sont déduites automatiquement de l'URL
+déjà configurée pour la caméra (RTSP/ONVIF) — rien à saisir en plus, et
+rien n'est stocké en double.
+
+Deux choses à garder en tête :
+
+- C'est un raccourci, pas une découverte réseau : si votre routeur n'est
+  pas à l'adresse ".1" de ce sous-réseau (passerelle à ".254", VLAN,
+  etc.), l'onglet ouvert affichera simplement la mauvaise adresse —
+  corrigez-la vous-même dans la barre d'adresse, aucune configuration
+  particulière n'est nécessaire ni possible ici.
+- Ces liens ouvrent la page de connexion **propre à la caméra ou au
+  routeur** (ses identifiants habituels, souvent `admin`/mot de passe
+  constructeur pour une caméra neuve) — pas un accès déjà authentifié.
+  Le NVR n'a et ne peut avoir aucun moyen de se connecter à votre place
+  sur un appareil tiers ; il ne fait qu'éviter d'avoir à retaper l'adresse
+  IP.
+- Ces liens n'apparaissent que si l'URL configurée contient une adresse
+  IPv4 simple (ex. `192.168.1.42`) — pas pour une caméra jointe via un nom
+  d'hôte/DDNS, où deviner une passerelle locale n'aurait pas de sens.
+
 ## Piloter une caméra PTZ
 
 Sur la page de la caméra, cochez **Camera PTZ (pilotage ONVIF)** et

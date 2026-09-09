@@ -420,6 +420,56 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
   ]);
 }
 
+// --- Quick access to a camera's (and its presumed router's) own local
+// web admin page - a one-click shortcut to the device's native login
+// screen (its own root/admin credentials, unrelated to NVR's own
+// accounts - the NVR has no way to authenticate into a third-party
+// device for you). Only offered for a plain IPv4 address, never a
+// hostname/DDNS name: guessing a LAN gateway only makes sense there.
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+function extractCameraHost(cam) {
+  for (const candidate of [cam.url, cam.onvif_url]) {
+    if (!candidate) continue;
+    try {
+      const host = new URL(candidate).hostname;
+      if (IPV4_RE.test(host)) return host;
+    } catch (e) {
+      // not a parseable absolute URL - try the next candidate
+    }
+  }
+  return null;
+}
+
+// Assumes the classic "router is the .1 of the camera's subnet"
+// convention - right on most home/small-office networks, but not
+// guaranteed (some routers sit at .254, VLANs complicate things, etc.).
+// It's a shortcut, not a discovery - if it's wrong for your network,
+// just correct the address once it opens.
+function guessGatewayIp(cameraIp) {
+  const m = IPV4_RE.exec(cameraIp);
+  return m ? `${m[1]}.${m[2]}.${m[3]}.1` : null;
+}
+
+function buildDeviceLinks(cam) {
+  const host = extractCameraHost(cam);
+  if (!host) return null;
+  const gateway = guessGatewayIp(host);
+  const links = [
+    el("a", {
+      href: `http://${host}/`, target: "_blank", rel: "noopener",
+      class: "device-link", title: `Ouvrir l'interface web de la camera (${host})`,
+    }, `📷 ${host}`),
+  ];
+  if (gateway && gateway !== host) {
+    links.push(el("a", {
+      href: `http://${gateway}/`, target: "_blank", rel: "noopener",
+      class: "device-link", title: `Ouvrir l'interface web du routeur (${gateway}, adresse deduite - a corriger vous-meme si ce n'est pas la bonne)`,
+    }, `📡 Routeur`));
+  }
+  return el("div", { class: "device-links" }, links);
+}
+
 function attachHls(videoEl, src, onFatalError) {
   if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
     videoEl.src = src;
