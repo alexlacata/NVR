@@ -224,6 +224,7 @@ document.getElementById("btn-logout").addEventListener("click", logout);
 (async () => {
   await requireAuth();
   document.getElementById("btn-add").hidden = !hasPermission("cameras_manage");
+  await loadRouterCredentialsForLinks();
   await loadDisk();
   await loadCameras();
   setInterval(loadCameras, 15000);

@@ -1,6 +1,8 @@
 import pytest
+import yaml
 
 from app.models import CameraCreate, CameraUpdate, SourceType
+from app.secrets_crypto import SecretsCipher
 from app.store import CameraNotFound, CameraStore, slugify
 
 
@@ -68,3 +70,62 @@ def test_persists_across_instances(tmp_path):
     cam = s1.create(CameraCreate(name="Toit", source_type=SourceType.test, url="test:pattern"))
     s2 = CameraStore(path)
     assert s2.get(cam.id).name == "Toit"
+
+
+def test_onvif_and_web_passwords_are_encrypted_at_rest(tmp_path):
+    path = tmp_path / "cameras.yaml"
+    cipher = SecretsCipher("a-secret-key")
+    store = CameraStore(path, cipher)
+    cam = store.create(CameraCreate(
+        name="Entree", source_type=SourceType.rtsp, url="rtsp://cam1/1",
+        onvif_password="onvif-secret", web_password="web-secret",
+    ))
+
+    on_disk = yaml.safe_load(path.read_text())
+    stored = on_disk["cameras"][cam.id]
+    assert stored["onvif_password"] != "onvif-secret"
+    assert stored["web_password"] != "web-secret"
+    assert cipher.decrypt(stored["onvif_password"]) == "onvif-secret"
+    assert cipher.decrypt(stored["web_password"]) == "web-secret"
+
+    # transparently decrypted for the store's own callers
+    fetched = store.get(cam.id)
+    assert fetched.onvif_password == "onvif-secret"
+    assert fetched.web_password == "web-secret"
+
+
+def test_passwords_roundtrip_across_store_instances(tmp_path):
+    path = tmp_path / "cameras.yaml"
+    cipher = SecretsCipher("a-secret-key")
+    cam = CameraStore(path, cipher).create(CameraCreate(
+        name="Entree", source_type=SourceType.rtsp, url="rtsp://cam1/1",
+        onvif_password="onvif-secret", web_password="web-secret",
+    ))
+    reopened = CameraStore(path, cipher)
+    fetched = reopened.get(cam.id)
+    assert fetched.onvif_password == "onvif-secret"
+    assert fetched.web_password == "web-secret"
+
+
+def test_without_a_cipher_passwords_stay_plaintext(tmp_path):
+    path = tmp_path / "cameras.yaml"
+    cam = CameraStore(path).create(CameraCreate(
+        name="Entree", source_type=SourceType.rtsp, url="rtsp://cam1/1",
+        onvif_password="onvif-secret", web_password="web-secret",
+    ))
+    on_disk = yaml.safe_load(path.read_text())
+    assert on_disk["cameras"][cam.id]["onvif_password"] == "onvif-secret"
+    assert on_disk["cameras"][cam.id]["web_password"] == "web-secret"
+
+
+def test_preexisting_plaintext_passwords_still_work_once_a_cipher_is_added(tmp_path):
+    path = tmp_path / "cameras.yaml"
+    cam = CameraStore(path).create(CameraCreate(
+        name="Entree", source_type=SourceType.rtsp, url="rtsp://cam1/1",
+        onvif_password="onvif-secret", web_password="web-secret",
+    ))
+
+    upgraded = CameraStore(path, SecretsCipher("a-secret-key"))
+    fetched = upgraded.get(cam.id)
+    assert fetched.onvif_password == "onvif-secret"
+    assert fetched.web_password == "web-secret"

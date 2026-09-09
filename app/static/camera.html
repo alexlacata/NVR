@@ -118,6 +118,16 @@
         </div>
       </div>
 
+      <div class="section-title" style="margin-top:10px">Interface web de la camera</div>
+      <div class="hint">Identifiants de connexion a l'interface d'administration native de la
+        camera (pas ceux du NVR) - utilises uniquement pour le lien d'acces rapide "Camera" sur
+        le tableau de bord. Laissez vide pour reutiliser les identifiants ONVIF ci-dessus s'ils
+        sont renseignes.</div>
+      <div class="row">
+        <div><label>Utilisateur (interface web)</label><input type="text" id="f-web-user"></div>
+        <div><label>Mot de passe (interface web)</label><input type="password" id="f-web-pass" autocomplete="new-password"></div>
+      </div>
+
       <div class="section-title" style="margin-top:10px">Detection de mouvement</div>
       <div class="checkbox-row"><input type="checkbox" id="f-motion-enabled"><label>Activer la detection de mouvement</label></div>
       <div id="motion-fields">
@@ -208,6 +218,8 @@ async function loadCamera() {
   document.getElementById("f-onvif-user").value = cam.onvif_username || "";
   document.getElementById("f-onvif-pass").value = cam.onvif_password || "";
   updatePtzFieldsVisibility();
+  document.getElementById("f-web-user").value = cam.web_username || "";
+  document.getElementById("f-web-pass").value = cam.web_password || "";
 
   document.getElementById("f-motion-enabled").checked = cam.motion_enabled;
   document.getElementById("f-motion-sensitivity").value = cam.motion_sensitivity;
@@ -759,6 +771,8 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         onvif_url: document.getElementById("f-onvif-url").value || null,
         onvif_username: document.getElementById("f-onvif-user").value || null,
         onvif_password: document.getElementById("f-onvif-pass").value || null,
+        web_username: document.getElementById("f-web-user").value || null,
+        web_password: document.getElementById("f-web-pass").value || null,
         motion_enabled: document.getElementById("f-motion-enabled").checked,
         motion_sensitivity: parseInt(document.getElementById("f-motion-sensitivity").value, 10),
         motion_mask_grid: motionMaskGrid,

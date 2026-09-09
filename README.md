@@ -302,23 +302,49 @@ liens sous son nom : **📷 &lt;adresse IP&gt;** et **📡 Routeur**. Ils
 ouvrent, dans un nouvel onglet, l'interface web native de la caméra
 (`http://<ip-camera>/`) et celle présumée du routeur (`http://<ip>.1/` —
 la convention classique du ".1" de la passerelle du même sous-réseau que
-la caméra). Adresse et convention sont déduites automatiquement de l'URL
-déjà configurée pour la caméra (RTSP/ONVIF) — rien à saisir en plus, et
-rien n'est stocké en double.
+la caméra). L'adresse est déduite automatiquement de l'URL déjà
+configurée pour la caméra (RTSP/ONVIF) — rien à saisir en plus pour ça.
 
-Deux choses à garder en tête :
+**Connexion automatique (quand les identifiants sont connus)** : si vous
+renseignez les identifiants de connexion de la caméra et/ou du routeur
+(voir ci-dessous), le lien les intègre directement dans l'adresse
+(authentification HTTP Basic) — un clic ouvre alors la page déjà
+connectée, sans ressaisir de mot de passe. Ça ne marche que si
+l'interface de l'appareil utilise elle-même ce mécanisme (fréquent sur
+les routeurs et beaucoup de caméras bas de gamme/anciennes ; une
+interface web plus moderne avec son propre formulaire de connexion
+JavaScript l'ignorera). Dans ce cas, un bouton **📋** à côté du lien copie
+"utilisateur / mot de passe" dans le presse-papier pour les coller
+manuellement dans le formulaire.
+
+Où sont renseignés ces identifiants :
+
+- **Caméra** : sur la page de la caméra, section *Interface web de la
+  caméra* — utilisateur/mot de passe de l'interface d'administration
+  native de la caméra (pas ceux du NVR). Si vous avez déjà renseigné des
+  identifiants ONVIF pour le PTZ (souvent le même compte), laissez ces
+  champs vides : ils sont réutilisés automatiquement. Le mot de passe est
+  chiffré au repos comme les autres secrets stockés (voir *Chiffrement
+  des secrets stockés* plus bas).
+- **Routeur** : dans **Paramètres → Routeur** *(administrateurs, ou un
+  lecteur avec la permission `Gérer les paramètres serveur`)* — un seul
+  identifiant global, réutilisé pour toutes les caméras. Réservé à ce
+  niveau de permission car, contrairement à l'identifiant d'une caméra,
+  celui du routeur donne potentiellement accès à tout le réseau (Wi-Fi,
+  redirections de ports...) ; un compte lecteur sans cette permission voit
+  toujours le lien **Routeur**, mais sans connexion automatique ni bouton
+  de copie.
+
+Trois choses à garder en tête, identifiants renseignés ou non :
 
 - C'est un raccourci, pas une découverte réseau : si votre routeur n'est
   pas à l'adresse ".1" de ce sous-réseau (passerelle à ".254", VLAN,
   etc.), l'onglet ouvert affichera simplement la mauvaise adresse —
-  corrigez-la vous-même dans la barre d'adresse, aucune configuration
-  particulière n'est nécessaire ni possible ici.
+  corrigez-la vous-même dans la barre d'adresse.
 - Ces liens ouvrent la page de connexion **propre à la caméra ou au
-  routeur** (ses identifiants habituels, souvent `admin`/mot de passe
-  constructeur pour une caméra neuve) — pas un accès déjà authentifié.
-  Le NVR n'a et ne peut avoir aucun moyen de se connecter à votre place
-  sur un appareil tiers ; il ne fait qu'éviter d'avoir à retaper l'adresse
-  IP.
+  routeur**, pas un accès magique. Le NVR n'a et ne peut avoir aucun
+  moyen de s'authentifier à votre place sur un appareil tiers au-delà de
+  rejouer ce que vous lui avez explicitement confié.
 - Ces liens n'apparaissent que si l'URL configurée contient une adresse
   IPv4 simple (ex. `192.168.1.42`) — pas pour une caméra jointe via un nom
   d'hôte/DDNS, où deviner une passerelle locale n'aurait pas de sens.
@@ -619,20 +645,24 @@ martèle une route (téléchargements en boucle, appels PTZ répétés...) sans
 affecter les autres comptes. Les fichiers statiques (interface web,
 vignettes) ne sont pas concernés — seule l'API l'est.
 
-**Chiffrement des secrets stockés** : deux secrets réversibles sont
+**Chiffrement des secrets stockés** : plusieurs secrets réversibles sont
 persistés par le serveur — le mot de passe SMTP (notifications par
-e-mail) et le secret TOTP de chaque compte (2FA). Les deux sont chiffrés
-avant écriture sur disque (`notifications.yaml`, `users.yaml`), avec une
-clé dérivée de `NVR_SECRET_KEY` (la même déjà utilisée pour signer les
+e-mail), le secret TOTP de chaque compte (2FA), le mot de passe
+ONVIF/interface web de chaque caméra, et le mot de passe du routeur (voir
+*Accès direct à l'interface de la caméra et du routeur* ci-dessus). Tous
+sont chiffrés avant écriture sur disque (`notifications.yaml`,
+`users.yaml`, `cameras.yaml`, `router_credentials.yaml`), avec une clé
+dérivée de `NVR_SECRET_KEY` (la même déjà utilisée pour signer les
 sessions — voir *Configuration* ci-dessous). Concrètement, un vol du
-fichier ou d'une sauvegarde seule (sans `NVR_SECRET_KEY`) n'expose ni l'un
-ni l'autre en clair. Ça ne protège pas contre la compromission du serveur
+fichier ou d'une sauvegarde seule (sans `NVR_SECRET_KEY`) n'expose aucun
+en clair. Ça ne protège pas contre la compromission du serveur
 lui-même : le processus a besoin de la clé pour déchiffrer à la volée
-(envoyer un e-mail, vérifier un code 2FA), donc une intrusion active sur
-la machine y a accès de toute façon — la même limite que le chiffrement
-de disque. Les autres secrets du système (mots de passe de compte, codes
-de secours 2FA) ne sont pas concernés : ils sont hachés (bcrypt), pas
-chiffrés — plus fort qu'un chiffrement réversible pour une valeur qu'on ne
+(envoyer un e-mail, vérifier un code 2FA, construire un lien de connexion
+automatique), donc une intrusion active sur la machine y a accès de toute
+façon — la même limite que le chiffrement de disque. Les autres secrets
+du système (mots de passe de compte, codes de secours 2FA) ne sont pas
+concernés : ils sont hachés (bcrypt), pas chiffrés — plus fort qu'un
+chiffrement réversible pour une valeur qu'on ne
 fait jamais que comparer, jamais relire.
 
 ## HTTPS
@@ -846,7 +876,8 @@ app/
   login_throttle.py         anti-bruteforce du login (blocage temporaire par compte)
   rate_limiter.py           limitation de débit générale de l'API (au-delà du login)
   session_store.py          persistance des sessions actives (YAML), pour lister/révoquer par compte
-  secrets_crypto.py         chiffrement au repos du mot de passe SMTP et du secret TOTP (cle derivee de NVR_SECRET_KEY)
+  secrets_crypto.py         chiffrement au repos des secrets stockes (SMTP, TOTP, caméra, routeur - cle derivee de NVR_SECRET_KEY)
+  router_credentials_store.py  persistance de l'identifiant du routeur (YAML), pour le lien d'acces rapide du tableau de bord
   ffmpeg_cmd.py        construction des commandes ffmpeg
   ffmpeg_manager.py    supervision des processus ffmpeg (démarrage/redémarrage)
   retention.py         purge automatique des enregistrements et vignettes

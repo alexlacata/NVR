@@ -202,6 +202,25 @@
       </form>
     </div>
 
+    <div class="section-title">Routeur</div>
+    <div class="card" style="padding:16px 18px">
+      <p class="hint" style="margin-top:0">
+        Identifiants de connexion a l'interface d'administration de votre routeur -
+        utilises uniquement pour le lien d'acces rapide "Routeur" sur le tableau de
+        bord (voir aussi les identifiants "Interface web" de chaque camera, sur sa
+        propre page). Le NVR ne se connecte jamais lui-meme au routeur : ces
+        identifiants ne servent qu'a pre-remplir ce raccourci.
+      </p>
+      <form class="form-grid" id="router-form">
+        <div class="row">
+          <div><label>Utilisateur</label><input type="text" id="r-user"></div>
+          <div><label>Mot de passe</label><input type="password" id="r-pass" autocomplete="new-password"></div>
+        </div>
+        <div class="error-msg" id="router-error"></div>
+        <div><button type="submit" class="btn">Enregistrer les identifiants du routeur</button></div>
+      </form>
+    </div>
+
     <div class="section-title">Sauvegarde</div>
     <div class="card" style="padding:16px 18px">
       <p class="hint" style="margin-top:0" id="backup-status-text">Chargement...</p>
@@ -627,6 +646,30 @@ document.getElementById("btn-notif-test").addEventListener("click", async () => 
   }
 });
 
+async function loadRouterCredentials() {
+  const r = await apiJson("/api/router-credentials");
+  document.getElementById("r-user").value = r.username || "";
+  document.getElementById("r-pass").value = r.password || "";
+}
+
+document.getElementById("router-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errorEl = document.getElementById("router-error");
+  errorEl.textContent = "";
+  try {
+    await apiJson("/api/router-credentials", {
+      method: "PATCH",
+      body: JSON.stringify({
+        username: document.getElementById("r-user").value || null,
+        password: document.getElementById("r-pass").value || null,
+      }),
+    });
+    toast("Identifiants du routeur enregistres");
+  } catch (e) {
+    errorEl.textContent = e.message;
+  }
+});
+
 function fmtBackupDate(iso) {
   if (!iso) return "jamais";
   try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
@@ -671,6 +714,7 @@ document.getElementById("btn-backup-run").addEventListener("click", async () => 
     document.getElementById("settings-section").hidden = false;
     await loadServerSettings();
     await loadNotificationSettings();
+    await loadRouterCredentials();
     await loadBackupStatus();
   }
 })();

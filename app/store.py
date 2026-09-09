@@ -11,8 +11,10 @@ from typing import Optional
 import yaml
 
 from app.models import Camera, CameraCreate, CameraUpdate
+from app.secrets_crypto import SecretsCipher
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+_ENCRYPTED_FIELDS = ("onvif_password", "web_password")
 
 
 def slugify(name: str) -> str:
@@ -36,8 +38,14 @@ class DuplicateCameraId(ValueError):
 class CameraStore:
     """Thread-safe CRUD store for cameras, persisted as YAML."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, cipher: Optional[SecretsCipher] = None):
         self._path = path
+        # Encrypts onvif_password/web_password at rest when a cipher is
+        # provided; every method below reads/writes plain dicts as before
+        # - only this read/write boundary knows about encryption, so a
+        # missed spot elsewhere in the store can't leave a secret
+        # unencrypted.
+        self._cipher = cipher
         self._lock = threading.RLock()
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if not self._path.exists():
@@ -48,9 +56,23 @@ class CameraStore:
             return {}
         with self._path.open("r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
-        return data.get("cameras", {})
+        cameras = data.get("cameras", {})
+        if self._cipher:
+            for cam in cameras.values():
+                for field in _ENCRYPTED_FIELDS:
+                    if cam.get(field):
+                        cam[field] = self._cipher.decrypt(cam[field])
+        return cameras
 
     def _write(self, cameras: dict[str, dict]) -> None:
+        if self._cipher:
+            cameras = {
+                key: {
+                    **cam,
+                    **{f: self._cipher.encrypt(cam[f]) for f in _ENCRYPTED_FIELDS if cam.get(f)},
+                }
+                for key, cam in cameras.items()
+            }
         tmp_path = self._path.with_suffix(".tmp")
         with tmp_path.open("w", encoding="utf-8") as fh:
             yaml.safe_dump({"cameras": cameras}, fh, sort_keys=True, allow_unicode=True)

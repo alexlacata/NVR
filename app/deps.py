@@ -15,6 +15,7 @@ from app.motion import MotionRegistry
 from app.notification_settings_store import NotificationSettingsStore
 from app.notifier import Notifier
 from app.ptz_registry import PTZRegistry
+from app.router_credentials_store import RouterCredentialsStore
 from app.session_store import SessionStore
 from app.settings_store import SettingsStore
 from app.store import CameraStore
@@ -80,6 +81,10 @@ def get_backup_status(request: Request) -> BackupStatusTracker:
 
 def get_session_store(request: Request) -> SessionStore:
     return request.app.state.session_store
+
+
+def get_router_credentials_store(request: Request) -> RouterCredentialsStore:
+    return request.app.state.router_credentials_store
 
 
 def _extract_token(request: Request) -> Optional[str]:

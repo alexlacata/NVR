@@ -84,6 +84,14 @@ class CameraBase(BaseModel):
     onvif_username: Optional[str] = Field(default=None, max_length=200)
     onvif_password: Optional[str] = Field(default=None, max_length=200)
 
+    # Login for the camera's own web admin page (its native interface, not
+    # this NVR) - used only to build the one-click "already logged in"
+    # shortcut on the dashboard (see app/static/js/app.js buildDeviceLinks).
+    # Left empty, that shortcut falls back to onvif_username/onvif_password
+    # when set (often the same account) rather than asking for it twice.
+    web_username: Optional[str] = Field(default=None, max_length=200)
+    web_password: Optional[str] = Field(default=None, max_length=200)
+
     # How often a thumbnail is extracted from this camera's recordings, for
     # the playback timeline. None = use the server-wide default.
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
@@ -179,6 +187,8 @@ class CameraUpdate(BaseModel):
     onvif_url: Optional[str] = Field(default=None, max_length=2000)
     onvif_username: Optional[str] = Field(default=None, max_length=200)
     onvif_password: Optional[str] = Field(default=None, max_length=200)
+    web_username: Optional[str] = Field(default=None, max_length=200)
+    web_password: Optional[str] = Field(default=None, max_length=200)
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
     motion_enabled: Optional[bool] = None
     motion_sensitivity: Optional[int] = Field(default=None, ge=0, le=100)
@@ -431,3 +441,21 @@ class NotificationSettingsUpdate(BaseModel):
     notify_on_camera_offline: Optional[bool] = None
     notify_on_disk_low: Optional[bool] = None
     notify_on_backup_failed: Optional[bool] = None
+
+
+# The router's own web-admin login (optional, single global record) - used
+# only to build a one-click "already logged in" shortcut to the router's
+# own admin page on the dashboard. Kept behind settings_manage, same as
+# the SMTP password above - just as able to grant real access if leaked.
+class RouterCredentialsBase(BaseModel):
+    username: Optional[str] = Field(default=None, max_length=200)
+    password: Optional[str] = Field(default=None, max_length=200)
+
+
+class RouterCredentials(RouterCredentialsBase):
+    pass
+
+
+class RouterCredentialsUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, max_length=200)
+    password: Optional[str] = Field(default=None, max_length=200)

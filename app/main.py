@@ -19,6 +19,7 @@ from app.api import (
     routes_notifications,
     routes_onvif,
     routes_ptz,
+    routes_router_credentials,
     routes_settings,
     routes_system,
     routes_systems,
@@ -38,6 +39,7 @@ from app.ptz_registry import PTZRegistry
 from app.rate_limiter import RateLimiter
 from app.recording_schedule import recording_schedule_loop
 from app.retention import retention_loop
+from app.router_credentials_store import RouterCredentialsStore
 from app.secrets_crypto import SecretsCipher
 from app.session_store import SessionStore
 from app.settings_store import SettingsStore
@@ -61,7 +63,8 @@ async def lifespan(app: FastAPI):
 
     app.state.settings = settings
     secrets_cipher = SecretsCipher(settings.resolve_secret_key())
-    app.state.store = CameraStore(settings.cameras_file)
+    app.state.store = CameraStore(settings.cameras_file, secrets_cipher)
+    app.state.router_credentials_store = RouterCredentialsStore(settings.router_credentials_file, secrets_cipher)
     app.state.systems_store = RemoteSystemStore(settings.systems_file)
     app.state.user_store = UserStore(settings.users_file, secrets_cipher)
     bootstrap_admin(settings, app.state.user_store)
@@ -173,6 +176,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_systems.router)
     app.include_router(routes_users.router)
     app.include_router(routes_settings.router)
+    app.include_router(routes_router_credentials.router)
 
     @app.get("/healthz")
     def healthz():

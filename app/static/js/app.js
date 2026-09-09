@@ -422,10 +422,16 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
 
 // --- Quick access to a camera's (and its presumed router's) own local
 // web admin page - a one-click shortcut to the device's native login
-// screen (its own root/admin credentials, unrelated to NVR's own
-// accounts - the NVR has no way to authenticate into a third-party
-// device for you). Only offered for a plain IPv4 address, never a
-// hostname/DDNS name: guessing a LAN gateway only makes sense there.
+// screen. When credentials are known (the camera's ONVIF/web-admin
+// login, or the globally configured router login), the link embeds them
+// as HTTP Basic Auth (works when that's what the device's own page
+// uses) and a copy button offers "user / password" as a fallback for a
+// device with a JS/HTML login form instead. Without known credentials,
+// it's the same plain address-only link as before. Either way this is
+// the DEVICE's own login, not the NVR's - it has no way to authenticate
+// into a third-party device beyond replaying what you've told it.
+// Only offered for a plain IPv4 address, never a hostname/DDNS name:
+// guessing a LAN gateway only makes sense there.
 const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
 function extractCameraHost(cam) {
@@ -451,23 +457,80 @@ function guessGatewayIp(cameraIp) {
   return m ? `${m[1]}.${m[2]}.${m[3]}.1` : null;
 }
 
+// Fetched once (not per camera card) since it's a single global record;
+// undefined = not fetched yet, {} = fetched but nothing usable (not
+// configured, or this account lacks settings_manage to even see it) -
+// either way the router link just stays a plain address-only link.
+let _routerCredentials = null;
+async function loadRouterCredentialsForLinks() {
+  try {
+    _routerCredentials = await apiJson("/api/router-credentials");
+  } catch (e) {
+    _routerCredentials = {};
+  }
+}
+
+function copyDeviceCredentials(username, password) {
+  const text = `${username} / ${password}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => toast("Identifiants copies"),
+      () => toast("Copie impossible - notez-les manuellement"),
+    );
+  } else {
+    toast("Copie impossible - notez-les manuellement");
+  }
+}
+
+// One device's link + copy button (when credentials are known), grouped
+// in a single wrapper so the pair wraps onto a new line together rather
+// than the copy button splitting off on its own.
+function deviceLinkGroup({ host, username, password, label, title }) {
+  const hasCreds = !!(username && password);
+  const href = hasCreds
+    ? `http://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}/`
+    : `http://${host}/`;
+  const stopBubble = (e) => e.stopPropagation(); // card itself may navigate on click
+  const children = [
+    el("a", {
+      href, target: "_blank", rel: "noopener", class: "device-link", onclick: stopBubble,
+      title: hasCreds ? `${title} - tente une connexion automatique` : title,
+    }, label),
+  ];
+  if (hasCreds) {
+    children.push(el("button", {
+      type: "button", class: "device-link-copy", title: "Copier les identifiants (utilisateur / mot de passe)",
+      onclick: (e) => { stopBubble(e); copyDeviceCredentials(username, password); },
+    }, "📋"));
+  }
+  return el("div", { class: "device-link-group" }, children);
+}
+
 function buildDeviceLinks(cam) {
   const host = extractCameraHost(cam);
   if (!host) return null;
-  const gateway = guessGatewayIp(host);
-  const links = [
-    el("a", {
-      href: `http://${host}/`, target: "_blank", rel: "noopener",
-      class: "device-link", title: `Ouvrir l'interface web de la camera (${host})`,
-    }, `📷 ${host}`),
+  // Reuses the ONVIF login when both fields are set (often the same
+  // account as the camera's own web admin) rather than asking for it
+  // twice; otherwise falls back to the dedicated web-admin fields.
+  const hasOnvifLogin = !!(cam.onvif_username && cam.onvif_password);
+  const camUsername = hasOnvifLogin ? cam.onvif_username : cam.web_username;
+  const camPassword = hasOnvifLogin ? cam.onvif_password : cam.web_password;
+  const groups = [
+    deviceLinkGroup({
+      host, username: camUsername, password: camPassword,
+      label: `📷 ${host}`, title: `Ouvrir l'interface web de la camera (${host})`,
+    }),
   ];
+  const gateway = guessGatewayIp(host);
   if (gateway && gateway !== host) {
-    links.push(el("a", {
-      href: `http://${gateway}/`, target: "_blank", rel: "noopener",
-      class: "device-link", title: `Ouvrir l'interface web du routeur (${gateway}, adresse deduite - a corriger vous-meme si ce n'est pas la bonne)`,
-    }, `📡 Routeur`));
+    const routerCreds = _routerCredentials || {};
+    groups.push(deviceLinkGroup({
+      host: gateway, username: routerCreds.username, password: routerCreds.password,
+      label: "📡 Routeur",
+      title: `Ouvrir l'interface web du routeur (${gateway}, adresse deduite - a corriger vous-meme si ce n'est pas la bonne)`,
+    }));
   }
-  return el("div", { class: "device-links" }, links);
+  return el("div", { class: "device-links" }, groups);
 }
 
 function attachHls(videoEl, src, onFatalError) {

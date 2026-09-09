@@ -141,6 +141,10 @@ class Settings(BaseSettings):
         return self.config_dir / "sessions.yaml"
 
     @property
+    def router_credentials_file(self) -> Path:
+        return self.config_dir / "router_credentials.yaml"
+
+    @property
     def recordings_dir(self) -> Path:
         return self.data_dir / "recordings"
 
