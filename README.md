@@ -335,6 +335,15 @@ Où sont renseignés ces identifiants :
   toujours le lien **Routeur**, mais sans connexion automatique ni bouton
   de copie.
 
+**HTTP ou HTTPS** : à côté de ces identifiants, une case *Interface
+accessible en HTTPS* (décochée par défaut) fait passer le lien
+correspondant en `https://` plutôt que `http://` — utile puisque
+beaucoup d'interfaces d'administration de caméras et de routeurs ne sont
+joignables qu'en HTTPS. Le certificat de ces interfaces est presque
+toujours auto-signé (l'appareil n'a pas de nom de domaine public) :
+attendez-vous à un avertissement de sécurité du navigateur à l'ouverture,
+normal ici, à valider une fois par appareil.
+
 Trois choses à garder en tête, identifiants renseignés ou non :
 
 - C'est un raccourci, pas une découverte réseau : si votre routeur n'est

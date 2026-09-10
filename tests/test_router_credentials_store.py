@@ -9,6 +9,14 @@ def test_get_returns_empty_when_no_file(tmp_path):
     creds = store.get()
     assert creds.username is None
     assert creds.password is None
+    assert creds.use_https is False
+
+
+def test_use_https_defaults_false_and_persists(tmp_path):
+    store = RouterCredentialsStore(tmp_path / "router.yaml")
+    updated = store.update({"use_https": True})
+    assert updated.use_https is True
+    assert store.get().use_https is True
 
 
 def test_update_persists_and_ignores_none_values(tmp_path):

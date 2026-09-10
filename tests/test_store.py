@@ -19,6 +19,14 @@ def test_create_and_get(store):
     assert fetched.enabled is True
 
 
+def test_web_use_https_defaults_false_and_persists(store):
+    cam = store.create(CameraCreate(name="Entree", source_type=SourceType.rtsp, url="rtsp://cam1/1"))
+    assert cam.web_use_https is False
+    updated = store.update(cam.id, CameraUpdate(web_use_https=True))
+    assert updated.web_use_https is True
+    assert store.get(cam.id).web_use_https is True
+
+
 def test_duplicate_names_get_unique_ids(store):
     a = store.create(CameraCreate(name="Garage", source_type=SourceType.rtsp, url="rtsp://a/x"))
     b = store.create(CameraCreate(name="Garage", source_type=SourceType.rtsp, url="rtsp://b/x"))

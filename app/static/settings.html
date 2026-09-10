@@ -216,6 +216,7 @@
           <div><label>Utilisateur</label><input type="text" id="r-user"></div>
           <div><label>Mot de passe</label><input type="password" id="r-pass" autocomplete="new-password"></div>
         </div>
+        <div class="checkbox-row"><input type="checkbox" id="r-https"><label>Interface accessible en HTTPS (au lieu de HTTP)</label></div>
         <div class="error-msg" id="router-error"></div>
         <div><button type="submit" class="btn">Enregistrer les identifiants du routeur</button></div>
       </form>
@@ -650,6 +651,7 @@ async function loadRouterCredentials() {
   const r = await apiJson("/api/router-credentials");
   document.getElementById("r-user").value = r.username || "";
   document.getElementById("r-pass").value = r.password || "";
+  document.getElementById("r-https").checked = r.use_https;
 }
 
 document.getElementById("router-form").addEventListener("submit", async (ev) => {
@@ -662,6 +664,7 @@ document.getElementById("router-form").addEventListener("submit", async (ev) => 
       body: JSON.stringify({
         username: document.getElementById("r-user").value || null,
         password: document.getElementById("r-pass").value || null,
+        use_https: document.getElementById("r-https").checked,
       }),
     });
     toast("Identifiants du routeur enregistres");

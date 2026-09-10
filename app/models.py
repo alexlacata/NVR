@@ -91,6 +91,10 @@ class CameraBase(BaseModel):
     # when set (often the same account) rather than asking for it twice.
     web_username: Optional[str] = Field(default=None, max_length=200)
     web_password: Optional[str] = Field(default=None, max_length=200)
+    # Many camera admin pages are HTTPS-only (typically with a self-signed
+    # certificate) - toggle this instead of the shortcut always assuming
+    # plain HTTP.
+    web_use_https: bool = False
 
     # How often a thumbnail is extracted from this camera's recordings, for
     # the playback timeline. None = use the server-wide default.
@@ -189,6 +193,7 @@ class CameraUpdate(BaseModel):
     onvif_password: Optional[str] = Field(default=None, max_length=200)
     web_username: Optional[str] = Field(default=None, max_length=200)
     web_password: Optional[str] = Field(default=None, max_length=200)
+    web_use_https: Optional[bool] = None
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
     motion_enabled: Optional[bool] = None
     motion_sensitivity: Optional[int] = Field(default=None, ge=0, le=100)
@@ -450,6 +455,10 @@ class NotificationSettingsUpdate(BaseModel):
 class RouterCredentialsBase(BaseModel):
     username: Optional[str] = Field(default=None, max_length=200)
     password: Optional[str] = Field(default=None, max_length=200)
+    # Most router admin pages are HTTPS-only (typically with a self-signed
+    # certificate) - toggle this instead of the shortcut always assuming
+    # plain HTTP.
+    use_https: bool = False
 
 
 class RouterCredentials(RouterCredentialsBase):
@@ -459,3 +468,4 @@ class RouterCredentials(RouterCredentialsBase):
 class RouterCredentialsUpdate(BaseModel):
     username: Optional[str] = Field(default=None, max_length=200)
     password: Optional[str] = Field(default=None, max_length=200)
+    use_https: Optional[bool] = None

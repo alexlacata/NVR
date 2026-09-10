@@ -127,6 +127,7 @@
         <div><label>Utilisateur (interface web)</label><input type="text" id="f-web-user"></div>
         <div><label>Mot de passe (interface web)</label><input type="password" id="f-web-pass" autocomplete="new-password"></div>
       </div>
+      <div class="checkbox-row"><input type="checkbox" id="f-web-https"><label>Interface accessible en HTTPS (au lieu de HTTP)</label></div>
 
       <div class="section-title" style="margin-top:10px">Detection de mouvement</div>
       <div class="checkbox-row"><input type="checkbox" id="f-motion-enabled"><label>Activer la detection de mouvement</label></div>
@@ -220,6 +221,7 @@ async function loadCamera() {
   updatePtzFieldsVisibility();
   document.getElementById("f-web-user").value = cam.web_username || "";
   document.getElementById("f-web-pass").value = cam.web_password || "";
+  document.getElementById("f-web-https").checked = cam.web_use_https;
 
   document.getElementById("f-motion-enabled").checked = cam.motion_enabled;
   document.getElementById("f-motion-sensitivity").value = cam.motion_sensitivity;
@@ -773,6 +775,7 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         onvif_password: document.getElementById("f-onvif-pass").value || null,
         web_username: document.getElementById("f-web-user").value || null,
         web_password: document.getElementById("f-web-pass").value || null,
+        web_use_https: document.getElementById("f-web-https").checked,
         motion_enabled: document.getElementById("f-motion-enabled").checked,
         motion_sensitivity: parseInt(document.getElementById("f-motion-sensitivity").value, 10),
         motion_mask_grid: motionMaskGrid,

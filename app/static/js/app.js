@@ -485,16 +485,20 @@ function copyDeviceCredentials(username, password) {
 // One device's link + copy button (when credentials are known), grouped
 // in a single wrapper so the pair wraps onto a new line together rather
 // than the copy button splitting off on its own.
-function deviceLinkGroup({ host, username, password, label, title }) {
+function deviceLinkGroup({ host, username, password, label, title, useHttps }) {
   const hasCreds = !!(username && password);
+  const scheme = useHttps ? "https" : "http";
   const href = hasCreds
-    ? `http://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}/`
-    : `http://${host}/`;
+    ? `${scheme}://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}/`
+    : `${scheme}://${host}/`;
   const stopBubble = (e) => e.stopPropagation(); // card itself may navigate on click
+  let fullTitle = title;
+  if (hasCreds) fullTitle += " - tente une connexion automatique";
+  if (useHttps) fullTitle += " (HTTPS - certificat probablement auto-signe, un avertissement du navigateur est normal)";
   const children = [
     el("a", {
       href, target: "_blank", rel: "noopener", class: "device-link", onclick: stopBubble,
-      title: hasCreds ? `${title} - tente une connexion automatique` : title,
+      title: fullTitle,
     }, label),
   ];
   if (hasCreds) {
@@ -517,7 +521,7 @@ function buildDeviceLinks(cam) {
   const camPassword = hasOnvifLogin ? cam.onvif_password : cam.web_password;
   const groups = [
     deviceLinkGroup({
-      host, username: camUsername, password: camPassword,
+      host, username: camUsername, password: camPassword, useHttps: cam.web_use_https,
       label: `📷 ${host}`, title: `Ouvrir l'interface web de la camera (${host})`,
     }),
   ];
@@ -525,7 +529,7 @@ function buildDeviceLinks(cam) {
   if (gateway && gateway !== host) {
     const routerCreds = _routerCredentials || {};
     groups.push(deviceLinkGroup({
-      host: gateway, username: routerCreds.username, password: routerCreds.password,
+      host: gateway, username: routerCreds.username, password: routerCreds.password, useHttps: routerCreds.use_https,
       label: "📡 Routeur",
       title: `Ouvrir l'interface web du routeur (${gateway}, adresse deduite - a corriger vous-meme si ce n'est pas la bonne)`,
     }));
