@@ -113,6 +113,17 @@ function pad2(n) { return String(n).padStart(2, "0"); }
 function localDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 function localTimeStr(d) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; }
 
+// Parses an optional integer field: empty stays null (unlimited/default),
+// but anything non-empty that isn't a whole number is rejected instead of
+// silently turning into null (JSON.stringify(NaN) === "null", so a typo
+// like "8oo" would otherwise be sent - and accepted - as "no limit").
+function parseOptionalIntField(id, label) {
+  const raw = document.getElementById(id).value.trim();
+  if (!raw) return null;
+  if (!/^\d+$/.test(raw)) throw new Error(`${label} : doit etre un nombre entier.`);
+  return parseInt(raw, 10);
+}
+
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -470,16 +481,18 @@ async function loadRouterCredentialsForLinks() {
   }
 }
 
-function copyDeviceCredentials(username, password) {
-  const text = `${username} / ${password}`;
+function copyTextToClipboard(text, successMessage) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(
-      () => toast("Identifiants copies"),
-      () => toast("Copie impossible - notez-les manuellement"),
+      () => toast(successMessage),
+      () => toast("Copie impossible - notez-le manuellement"),
     );
   } else {
-    toast("Copie impossible - notez-les manuellement");
+    toast("Copie impossible - notez-le manuellement");
   }
+}
+function copyDeviceCredentials(username, password) {
+  copyTextToClipboard(`${username} / ${password}`, "Identifiants copies");
 }
 
 // One device's link + copy button (when credentials are known), grouped
@@ -510,6 +523,31 @@ function deviceLinkGroup({ host, username, password, label, title, useHttps }) {
   return el("div", { class: "device-link-group" }, children);
 }
 
+// SSH has no equivalent of HTTP Basic Auth - there's no safe way to embed
+// a password in a link, so this never asks for or stores one. Only shown
+// when a username is explicitly configured (most consumer cameras don't
+// expose SSH at all, so there's no useful default to fall back to). The
+// ssh:// link only does something if the browser/OS has an SSH client
+// registered as its handler (common on Linux/macOS, not guaranteed on
+// Windows) - the copy button is the reliable fallback either way.
+function sshLinkGroup(host, username, port) {
+  if (!username) return null;
+  const p = port || 22;
+  const href = `ssh://${encodeURIComponent(username)}@${host}:${p}`;
+  const command = p === 22 ? `ssh ${username}@${host}` : `ssh ${username}@${host} -p ${p}`;
+  const stopBubble = (e) => e.stopPropagation();
+  return el("div", { class: "device-link-group" }, [
+    el("a", {
+      href, target: "_blank", rel: "noopener", class: "device-link", onclick: stopBubble,
+      title: "Ouvrir avec le client SSH associe a ce protocole sur votre systeme, s'il y en a un - aucun mot de passe n'est envoye, vous le saisissez normalement dans le terminal",
+    }, "🖥 SSH"),
+    el("button", {
+      type: "button", class: "device-link-copy", title: "Copier la commande SSH",
+      onclick: (e) => { stopBubble(e); copyTextToClipboard(command, "Commande copiee"); },
+    }, "📋"),
+  ]);
+}
+
 function buildDeviceLinks(cam) {
   const host = extractCameraHost(cam);
   if (!host) return null;
@@ -525,6 +563,8 @@ function buildDeviceLinks(cam) {
       label: `📷 ${host}`, title: `Ouvrir l'interface web de la camera (${host})`,
     }),
   ];
+  const camSsh = sshLinkGroup(host, cam.ssh_username, cam.ssh_port);
+  if (camSsh) groups.push(camSsh);
   const gateway = guessGatewayIp(host);
   if (gateway && gateway !== host) {
     const routerCreds = _routerCredentials || {};
@@ -533,6 +573,8 @@ function buildDeviceLinks(cam) {
       label: "📡 Routeur",
       title: `Ouvrir l'interface web du routeur (${gateway}, adresse deduite - a corriger vous-meme si ce n'est pas la bonne)`,
     }));
+    const routerSsh = sshLinkGroup(gateway, routerCreds.ssh_username, routerCreds.ssh_port);
+    if (routerSsh) groups.push(routerSsh);
   }
   return el("div", { class: "device-links" }, groups);
 }

@@ -344,6 +344,30 @@ toujours auto-signé (l'appareil n'a pas de nom de domaine public) :
 attendez-vous à un avertissement de sécurité du navigateur à l'ouverture,
 normal ici, à valider une fois par appareil.
 
+**Accès SSH** : un troisième lien optionnel, **🖥 SSH**, apparaît si vous
+renseignez un utilisateur SSH pour la caméra (sa propre page) ou pour le
+routeur (Paramètres → Routeur) — le port est ajusté à côté (22 par
+défaut). Contrairement au lien d'interface web ci-dessus, **aucun mot de
+passe SSH n'est jamais demandé ni stocké** : SSH n'a pas d'équivalent à
+l'authentification HTTP Basic, et enregistrer un mot de passe root SSH
+serait bien plus risqué qu'un mot de passe d'interface web (un accès SSH
+root donne un contrôle total du système, pas juste de son interface).
+Concrètement :
+
+- Le lien `ssh://utilisateur@ip:port` ne fait quelque chose que si votre
+  système a un client SSH associé à ce protocole (courant sur Linux/macOS,
+  pas garanti sur Windows sans installation tierce) — et il ne connecte
+  jamais automatiquement, vous entrez votre mot de passe (ou passphrase de
+  clé) normalement.
+- Le bouton **📋** à côté copie la commande prête à coller dans un
+  terminal (`ssh utilisateur@ip` ou `ssh utilisateur@ip -p port` si le
+  port n'est pas 22).
+- La plupart des caméras IP grand public n'exposent aucun serveur SSH —
+  laissez ces champs vides dans ce cas, le lien SSH n'apparaît pas. C'est
+  plus courant sur des routeurs orientés utilisateurs avancés (OpenWrt,
+  pfSense, Ubiquiti...) ou du matériel à base de Linux (ex. un Raspberry
+  Pi sur un site distant).
+
 Trois choses à garder en tête, identifiants renseignés ou non :
 
 - C'est un raccourci, pas une découverte réseau : si votre routeur n'est

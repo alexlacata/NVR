@@ -19,6 +19,18 @@ def test_use_https_defaults_false_and_persists(tmp_path):
     assert store.get().use_https is True
 
 
+def test_ssh_username_and_port_default_none_and_persist(tmp_path):
+    store = RouterCredentialsStore(tmp_path / "router.yaml")
+    creds = store.get()
+    assert creds.ssh_username is None
+    assert creds.ssh_port is None
+    updated = store.update({"ssh_username": "root", "ssh_port": 2222})
+    assert updated.ssh_username == "root"
+    assert updated.ssh_port == 2222
+    assert store.get().ssh_username == "root"
+    assert store.get().ssh_port == 2222
+
+
 def test_update_persists_and_ignores_none_values(tmp_path):
     store = RouterCredentialsStore(tmp_path / "router.yaml")
     updated = store.update({"username": "admin", "password": "hunter2"})

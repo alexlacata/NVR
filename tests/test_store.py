@@ -27,6 +27,18 @@ def test_web_use_https_defaults_false_and_persists(store):
     assert store.get(cam.id).web_use_https is True
 
 
+def test_ssh_username_and_port_default_none_and_persist(store):
+    cam = store.create(CameraCreate(name="Entree", source_type=SourceType.rtsp, url="rtsp://cam1/1"))
+    assert cam.ssh_username is None
+    assert cam.ssh_port is None
+    updated = store.update(cam.id, CameraUpdate(ssh_username="root", ssh_port=2222))
+    assert updated.ssh_username == "root"
+    assert updated.ssh_port == 2222
+    fetched = store.get(cam.id)
+    assert fetched.ssh_username == "root"
+    assert fetched.ssh_port == 2222
+
+
 def test_duplicate_names_get_unique_ids(store):
     a = store.create(CameraCreate(name="Garage", source_type=SourceType.rtsp, url="rtsp://a/x"))
     b = store.create(CameraCreate(name="Garage", source_type=SourceType.rtsp, url="rtsp://b/x"))

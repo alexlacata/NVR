@@ -96,6 +96,15 @@ class CameraBase(BaseModel):
     # plain HTTP.
     web_use_https: bool = False
 
+    # SSH quick-access (username/port only, deliberately no password field):
+    # there's no safe way to auto-authenticate SSH from a link the way HTTP
+    # Basic Auth allows, and storing an SSH password would be far riskier
+    # than the web login above - this only builds a ready ssh:// link and a
+    # copy-paste command, never a stored credential. Most consumer cameras
+    # don't expose SSH at all; leave blank when that's the case.
+    ssh_username: Optional[str] = Field(default=None, max_length=200)
+    ssh_port: Optional[int] = Field(default=None, ge=1, le=65535)
+
     # How often a thumbnail is extracted from this camera's recordings, for
     # the playback timeline. None = use the server-wide default.
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
@@ -194,6 +203,8 @@ class CameraUpdate(BaseModel):
     web_username: Optional[str] = Field(default=None, max_length=200)
     web_password: Optional[str] = Field(default=None, max_length=200)
     web_use_https: Optional[bool] = None
+    ssh_username: Optional[str] = Field(default=None, max_length=200)
+    ssh_port: Optional[int] = Field(default=None, ge=1, le=65535)
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
     motion_enabled: Optional[bool] = None
     motion_sensitivity: Optional[int] = Field(default=None, ge=0, le=100)
@@ -459,6 +470,10 @@ class RouterCredentialsBase(BaseModel):
     # certificate) - toggle this instead of the shortcut always assuming
     # plain HTTP.
     use_https: bool = False
+    # SSH quick-access (username/port only, deliberately no password field -
+    # see Camera.ssh_username above for why).
+    ssh_username: Optional[str] = Field(default=None, max_length=200)
+    ssh_port: Optional[int] = Field(default=None, ge=1, le=65535)
 
 
 class RouterCredentials(RouterCredentialsBase):
@@ -469,3 +484,5 @@ class RouterCredentialsUpdate(BaseModel):
     username: Optional[str] = Field(default=None, max_length=200)
     password: Optional[str] = Field(default=None, max_length=200)
     use_https: Optional[bool] = None
+    ssh_username: Optional[str] = Field(default=None, max_length=200)
+    ssh_port: Optional[int] = Field(default=None, ge=1, le=65535)

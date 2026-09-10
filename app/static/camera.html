@@ -129,6 +129,17 @@
       </div>
       <div class="checkbox-row"><input type="checkbox" id="f-web-https"><label>Interface accessible en HTTPS (au lieu de HTTP)</label></div>
 
+      <div class="section-title" style="margin-top:10px">Acces SSH</div>
+      <div class="hint">Uniquement si la camera expose un serveur SSH (rare sur les cameras grand
+        public) - construit un lien ssh:// (fonctionne si votre systeme a un client SSH associe a
+        ce protocole) et un bouton pour copier la commande. Aucun mot de passe n'est demande ni
+        stocke ici : SSH n'a pas d'equivalent sur de l'authentification HTTP Basic, le saisir dans
+        un lien serait risque - vous le saisissez vous-meme dans votre terminal.</div>
+      <div class="row">
+        <div><label>Utilisateur SSH</label><input type="text" id="f-ssh-user" placeholder="root"></div>
+        <div><label>Port SSH</label><input type="text" inputmode="numeric" id="f-ssh-port" placeholder="22"></div>
+      </div>
+
       <div class="section-title" style="margin-top:10px">Detection de mouvement</div>
       <div class="checkbox-row"><input type="checkbox" id="f-motion-enabled"><label>Activer la detection de mouvement</label></div>
       <div id="motion-fields">
@@ -222,6 +233,8 @@ async function loadCamera() {
   document.getElementById("f-web-user").value = cam.web_username || "";
   document.getElementById("f-web-pass").value = cam.web_password || "";
   document.getElementById("f-web-https").checked = cam.web_use_https;
+  document.getElementById("f-ssh-user").value = cam.ssh_username || "";
+  document.getElementById("f-ssh-port").value = cam.ssh_port || "";
 
   document.getElementById("f-motion-enabled").checked = cam.motion_enabled;
   document.getElementById("f-motion-sensitivity").value = cam.motion_sensitivity;
@@ -739,17 +752,6 @@ document.getElementById("date-filter").addEventListener("change", (e) => {
   loadTimeline(e.target.value || null);
 });
 
-// Parses an optional integer field: empty stays null (unlimited/default),
-// but anything non-empty that isn't a whole number is rejected instead of
-// silently turning into null (JSON.stringify(NaN) === "null", so a typo
-// like "8oo" would otherwise be sent - and accepted - as "no limit").
-function parseOptionalIntField(id, label) {
-  const raw = document.getElementById(id).value.trim();
-  if (!raw) return null;
-  if (!/^\d+$/.test(raw)) throw new Error(`${label} : doit etre un nombre entier.`);
-  return parseInt(raw, 10);
-}
-
 document.getElementById("edit-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const errorEl = document.getElementById("edit-error");
@@ -757,6 +759,7 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
   try {
     const liveMaxBitrateKbps = parseOptionalIntField("f-bitrate", "Bitrate maximum du direct");
     const thumbnailIntervalSeconds = parseOptionalIntField("f-thumb-interval", "Intervalle entre deux vignettes");
+    const sshPort = parseOptionalIntField("f-ssh-port", "Port SSH");
     await apiJson(`/api/cameras/${encodeURIComponent(camId)}`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -776,6 +779,8 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         web_username: document.getElementById("f-web-user").value || null,
         web_password: document.getElementById("f-web-pass").value || null,
         web_use_https: document.getElementById("f-web-https").checked,
+        ssh_username: document.getElementById("f-ssh-user").value || null,
+        ssh_port: sshPort,
         motion_enabled: document.getElementById("f-motion-enabled").checked,
         motion_sensitivity: parseInt(document.getElementById("f-motion-sensitivity").value, 10),
         motion_mask_grid: motionMaskGrid,
