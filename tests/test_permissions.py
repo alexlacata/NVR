@@ -63,6 +63,44 @@ async def test_viewer_granted_cameras_manage_can_create_camera(client):
 
 
 @pytest.mark.asyncio
+async def test_viewer_without_cameras_manage_does_not_see_web_admin_passwords(client):
+    await _login_admin(client)
+    create_resp = await client.post("/api/cameras", json={
+        "name": "Cam", "source_type": "test", "url": "test:pattern",
+        "onvif_username": "admin", "onvif_password": "onvif-secret",
+        "web_username": "admin", "web_password": "web-secret",
+    })
+    camera_id = create_resp.json()["id"]
+
+    await _create_viewer(client)
+    await _login(client, "bob", "viewerpass1")
+
+    list_resp = await client.get("/api/cameras")
+    cam = list_resp.json()[0]
+    assert cam["onvif_password"] is None
+    assert cam["web_password"] is None
+
+    get_resp = await client.get(f"/api/cameras/{camera_id}")
+    assert get_resp.json()["onvif_password"] is None
+    assert get_resp.json()["web_password"] is None
+
+
+@pytest.mark.asyncio
+async def test_viewer_with_cameras_manage_does_see_web_admin_passwords(client):
+    await _login_admin(client)
+    await client.post("/api/cameras", json={
+        "name": "Cam", "source_type": "test", "url": "test:pattern",
+        "web_username": "admin", "web_password": "web-secret",
+    })
+
+    await _create_viewer(client, permissions=["cameras_manage"])
+    await _login(client, "bob", "viewerpass1")
+
+    list_resp = await client.get("/api/cameras")
+    assert list_resp.json()[0]["web_password"] == "web-secret"
+
+
+@pytest.mark.asyncio
 async def test_admin_can_grant_and_revoke_permissions_via_patch(client):
     await _login_admin(client)
     await _create_viewer(client)

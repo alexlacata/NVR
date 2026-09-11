@@ -320,12 +320,16 @@ manuellement dans le formulaire.
 Où sont renseignés ces identifiants :
 
 - **Caméra** : sur la page de la caméra, section *Interface web de la
-  caméra* — utilisateur/mot de passe de l'interface d'administration
+  caméra* *(administrateurs, ou un lecteur avec la permission `Gérer les
+  caméras`)* — utilisateur/mot de passe de l'interface d'administration
   native de la caméra (pas ceux du NVR). Si vous avez déjà renseigné des
   identifiants ONVIF pour le PTZ (souvent le même compte), laissez ces
   champs vides : ils sont réutilisés automatiquement. Le mot de passe est
   chiffré au repos comme les autres secrets stockés (voir *Chiffrement
-  des secrets stockés* plus bas).
+  des secrets stockés* plus bas). Un compte lecteur sans cette permission
+  voit toujours le lien **📷** de la caméra, mais sans connexion
+  automatique ni bouton de copie — ces mots de passe ne lui sont jamais
+  transmis.
 - **Routeur** : dans **Paramètres → Routeur** *(administrateurs, ou un
   lecteur avec la permission `Gérer les paramètres serveur`)* — un seul
   identifiant global, réutilisé pour toutes les caméras. Réservé à ce
@@ -370,10 +374,12 @@ Concrètement :
 
 Trois choses à garder en tête, identifiants renseignés ou non :
 
-- C'est un raccourci, pas une découverte réseau : si votre routeur n'est
-  pas à l'adresse ".1" de ce sous-réseau (passerelle à ".254", VLAN,
-  etc.), l'onglet ouvert affichera simplement la mauvaise adresse —
-  corrigez-la vous-même dans la barre d'adresse.
+- L'adresse ".1" est un raccourci, pas une découverte réseau : si votre
+  routeur est ailleurs sur ce sous-réseau (passerelle à ".254", VLAN,
+  etc.), renseignez son adresse exacte une bonne fois pour toutes dans
+  **Paramètres → Routeur → Adresse IP du routeur** plutôt que de la
+  corriger à chaque fois dans la barre d'adresse — cette valeur, quand
+  elle est renseignée, remplace systématiquement la déduction automatique.
 - Ces liens ouvrent la page de connexion **propre à la caméra ou au
   routeur**, pas un accès magique. Le NVR n'a et ne peut avoir aucun
   moyen de s'authentifier à votre place sur un appareil tiers au-delà de

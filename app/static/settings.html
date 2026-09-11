@@ -217,6 +217,13 @@
           <div><label>Mot de passe</label><input type="password" id="r-pass" autocomplete="new-password"></div>
         </div>
         <div class="checkbox-row"><input type="checkbox" id="r-https"><label>Interface accessible en HTTPS (au lieu de HTTP)</label></div>
+        <div class="hint">Le lien "Routeur" du tableau de bord devine l'adresse du routeur
+          (le ".1" du reseau de chaque camera) - laissez le champ ci-dessous vide pour
+          garder cette deduction automatique, ou indiquez l'adresse exacte si elle est
+          fausse pour votre reseau (routeur en ".254", VLAN...).</div>
+        <div class="row">
+          <div><label>Adresse IP du routeur (optionnel)</label><input type="text" id="r-ip-override" placeholder="192.168.1.1"></div>
+        </div>
         <div class="hint">Acces SSH (optionnel, si votre routeur en expose un) : construit un lien
           ssh:// et un bouton pour copier la commande - aucun mot de passe n'est demande ni stocke,
           vous le saisissez vous-meme dans votre terminal.</div>
@@ -659,6 +666,7 @@ async function loadRouterCredentials() {
   document.getElementById("r-user").value = r.username || "";
   document.getElementById("r-pass").value = r.password || "";
   document.getElementById("r-https").checked = r.use_https;
+  document.getElementById("r-ip-override").value = r.ip_override || "";
   document.getElementById("r-ssh-user").value = r.ssh_username || "";
   document.getElementById("r-ssh-port").value = r.ssh_port || "";
 }
@@ -669,12 +677,17 @@ document.getElementById("router-form").addEventListener("submit", async (ev) => 
   errorEl.textContent = "";
   try {
     const sshPort = parseOptionalIntField("r-ssh-port", "Port SSH");
+    const ipOverride = document.getElementById("r-ip-override").value.trim() || null;
+    if (ipOverride && !IPV4_RE.test(ipOverride)) {
+      throw new Error("Adresse IP du routeur : doit etre une adresse IPv4 (ex: 192.168.1.1).");
+    }
     await apiJson("/api/router-credentials", {
       method: "PATCH",
       body: JSON.stringify({
         username: document.getElementById("r-user").value || null,
         password: document.getElementById("r-pass").value || null,
         use_https: document.getElementById("r-https").checked,
+        ip_override: ipOverride,
         ssh_username: document.getElementById("r-ssh-user").value || null,
         ssh_port: sshPort,
       }),

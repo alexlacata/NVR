@@ -565,13 +565,19 @@ function buildDeviceLinks(cam) {
   ];
   const camSsh = sshLinkGroup(host, cam.ssh_username, cam.ssh_port);
   if (camSsh) groups.push(camSsh);
-  const gateway = guessGatewayIp(host);
+  const routerCreds = _routerCredentials || {};
+  // A manually-set router IP (Parametres -> Routeur) always wins over the
+  // ".1" guess - it exists specifically for networks where that guess is
+  // wrong (router at .254, VLANs...).
+  const gateway = routerCreds.ip_override || guessGatewayIp(host);
   if (gateway && gateway !== host) {
-    const routerCreds = _routerCredentials || {};
+    const guessed = !routerCreds.ip_override;
     groups.push(deviceLinkGroup({
       host: gateway, username: routerCreds.username, password: routerCreds.password, useHttps: routerCreds.use_https,
       label: "📡 Routeur",
-      title: `Ouvrir l'interface web du routeur (${gateway}, adresse deduite - a corriger vous-meme si ce n'est pas la bonne)`,
+      title: guessed
+        ? `Ouvrir l'interface web du routeur (${gateway}, adresse deduite - corrigez-la dans Parametres si ce n'est pas la bonne)`
+        : `Ouvrir l'interface web du routeur (${gateway})`,
     }));
     const routerSsh = sshLinkGroup(gateway, routerCreds.ssh_username, routerCreds.ssh_port);
     if (routerSsh) groups.push(routerSsh);

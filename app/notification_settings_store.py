@@ -38,8 +38,14 @@ class NotificationSettingsStore:
     def update(self, patch: dict) -> NotificationSettings:
         with self._lock:
             current = self.get().model_dump()
+            # The caller (routes_notifications.py) already filters out
+            # fields the client didn't send via exclude_unset=True, so any
+            # key that does arrive here - None included - is an explicit
+            # instruction: None means "clear this field", not "leave it
+            # alone" (otherwise a blanked-out smtp_password/url could never
+            # be removed once set).
             for key, value in patch.items():
-                if key in FIELDS and value is not None:
+                if key in FIELDS:
                     current[key] = value
             updated = NotificationSettings(**current)
             to_persist = updated.model_dump()

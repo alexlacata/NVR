@@ -69,3 +69,25 @@ async def test_viewer_with_settings_manage_can_access_router_credentials(client)
 async def test_router_credentials_require_auth(client):
     resp = await client.get("/api/router-credentials")
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_patch_router_credentials_can_clear_a_previously_set_field(client):
+    await _login_admin(client)
+    await client.patch("/api/router-credentials", json={"username": "admin", "password": "hunter2"})
+
+    resp = await client.patch("/api/router-credentials", json={"username": None})
+    assert resp.status_code == 200
+    assert resp.json()["username"] is None
+    assert resp.json()["password"] == "hunter2"
+
+
+@pytest.mark.asyncio
+async def test_patch_router_credentials_ip_override(client):
+    await _login_admin(client)
+    resp = await client.patch("/api/router-credentials", json={"ip_override": "192.168.1.254"})
+    assert resp.status_code == 200
+    assert resp.json()["ip_override"] == "192.168.1.254"
+
+    resp = await client.patch("/api/router-credentials", json={"ip_override": "not-an-ip"})
+    assert resp.status_code == 422
