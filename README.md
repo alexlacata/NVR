@@ -317,6 +317,16 @@ JavaScript l'ignorera). Dans ce cas, un bouton **📋** à côté du lien copie
 "utilisateur / mot de passe" dans le presse-papier pour les coller
 manuellement dans le formulaire.
 
+**Sur iPhone/iPad, ce lien reste volontairement une simple adresse, sans
+identifiants intégrés** : iOS (Safari, mais aussi Chrome, Firefox... tous
+les navigateurs y tournent sur le même moteur WebKit imposé par Apple)
+refuse silencieusement d'ouvrir un lien contenant des identifiants —
+aucune erreur, aucun onglet ne s'ouvre, ça ne fait juste rien. C'est
+détecté automatiquement : sur ces appareils, le lien reste cliquable
+(adresse simple) et le bouton **📋** copie les identifiants pour les
+coller vous-même. Sur ordinateur et Android, la connexion automatique
+fonctionne normalement.
+
 Où sont renseignés ces identifiants :
 
 - **Caméra** : sur la page de la caméra, section *Interface web de la

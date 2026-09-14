@@ -495,18 +495,32 @@ function copyDeviceCredentials(username, password) {
   copyTextToClipboard(`${username} / ${password}`, "Identifiants copies");
 }
 
+// iOS's WebKit layer silently refuses to navigate to ANY url with
+// embedded userinfo (user:pass@host) credentials, on every browser there
+// (Safari, Chrome, Firefox... all iOS browsers are WebKit under the hood
+// per Apple's App Store rules) - tapping the link visibly does nothing,
+// no error, no new tab. Detected once; iPadOS 13+ reports itself as a
+// desktop Mac, hence the touch-points check.
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 // One device's link + copy button (when credentials are known), grouped
 // in a single wrapper so the pair wraps onto a new line together rather
 // than the copy button splitting off on its own.
 function deviceLinkGroup({ host, username, password, label, title, useHttps }) {
   const hasCreds = !!(username && password);
   const scheme = useHttps ? "https" : "http";
-  const href = hasCreds
+  // On iOS, embedding credentials makes the link a silent no-op (see
+  // IS_IOS above) - fall back to a plain address link there so at least
+  // that opens, and lean on the copy button for the rest.
+  const embedCreds = hasCreds && !IS_IOS;
+  const href = embedCreds
     ? `${scheme}://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}/`
     : `${scheme}://${host}/`;
   const stopBubble = (e) => e.stopPropagation(); // card itself may navigate on click
   let fullTitle = title;
-  if (hasCreds) fullTitle += " - tente une connexion automatique";
+  if (embedCreds) fullTitle += " - tente une connexion automatique";
+  else if (hasCreds) fullTitle += " - identifiants connus mais non inclus dans ce lien (iOS bloque ces liens) : utilisez le bouton Copier";
   if (useHttps) fullTitle += " (HTTPS - certificat probablement auto-signe, un avertissement du navigateur est normal)";
   const children = [
     el("a", {
