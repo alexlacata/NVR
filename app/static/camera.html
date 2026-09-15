@@ -26,6 +26,7 @@
 <div class="container">
   <div class="card">
     <div class="video-wrap detail-video" id="video-wrap"></div>
+    <div id="cam-device-links" style="padding:10px 12px 12px"></div>
   </div>
 
   <div id="ptz-panel" hidden></div>
@@ -188,6 +189,11 @@ async function loadCamera() {
   document.getElementById("cam-title").textContent = cam.name;
   document.title = `NVR - ${cam.name}`;
   setBadge(cam.status.state);
+
+  const linksWrap = document.getElementById("cam-device-links");
+  linksWrap.innerHTML = "";
+  const links = buildDeviceLinks(cam);
+  if (links) linksWrap.appendChild(links);
 
   const videoWrap = document.getElementById("video-wrap");
   const wasPlaying = !!currentHls;
@@ -824,6 +830,7 @@ function mountStreamHelpers() {
     document.getElementById("admin-settings-section").hidden = true;
   }
   systemInfo = await apiJson("/api/system").catch(() => null);
+  await loadRouterCredentialsForLinks();
   await loadCamera();
   if (hasPermission("cameras_manage")) mountStreamHelpers();
   const today = localDateStr(new Date());

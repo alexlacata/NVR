@@ -31,7 +31,6 @@
 
 <div id="modal-root"></div>
 
-<script src="/js/hls.min.js"></script>
 <script src="/js/app.js"></script>
 <script>
 const grid = document.getElementById("grid");
@@ -50,19 +49,36 @@ function renderDiskCard(info) {
   ]));
 }
 
-function attachVideo(videoWrap, cam) {
+// Dashboard cards show a still snapshot, not a live stream: playing every
+// camera's HLS feed at once as soon as the page loads adds up fast on a
+// metered/4G connection for no real benefit (you're not watching most of
+// them at any given moment). Clicking through to camera.html - the only
+// place actually asking to watch - is where the real live view starts.
+function attachPreview(videoWrap, cam) {
   const state = cam.status.state;
   videoWrap.innerHTML = "";
   if (state !== "running" && state !== "starting") {
     videoWrap.appendChild(el("div", { class: "offline" }, statusLabel(state)));
     return null;
   }
-  const video = el("video", { muted: "", autoplay: "", playsinline: "", loop: "" });
-  videoWrap.appendChild(video);
-  return attachHls(video, `/api/cameras/${cam.id}/live/stream.m3u8`, () => {
-    videoWrap.innerHTML = "";
-    videoWrap.appendChild(el("div", { class: "offline" }, "Flux indisponible pour le moment"));
+  const img = el("img", {
+    src: `/api/cameras/${cam.id}/snapshot.jpg?t=${Date.now()}`,
+    alt: `Apercu de ${cam.name}`,
+    loading: "lazy",
   });
+  img.addEventListener("error", () => {
+    videoWrap.innerHTML = "";
+    videoWrap.appendChild(el("div", { class: "offline" }, "Apercu indisponible"));
+  });
+  videoWrap.appendChild(el("a", {
+    href: `/camera.html?id=${encodeURIComponent(cam.id)}`,
+    class: "video-preview-link",
+    title: "Voir le direct",
+  }, [
+    img,
+    el("span", { class: "play-overlay" }, "▶"),
+  ]));
+  return img;
 }
 
 function cameraCard(cam) {
@@ -79,9 +95,20 @@ function cameraCard(cam) {
     ]),
     buildDeviceLinks(cam),
   ]);
-  const entry = { cam, cardEl, badgeEl: badge, videoWrapEl: videoWrap, hls: null };
-  entry.hls = attachVideo(videoWrap, cam);
+  const entry = { cam, cardEl, badgeEl: badge, videoWrapEl: videoWrap, previewImg: null };
+  entry.previewImg = attachPreview(videoWrap, cam);
   return entry;
+}
+
+// Refreshes only the still snapshot (one small JPEG per online camera),
+// not a stream - keeps dashboard previews from going stale for hours
+// without reintroducing continuous per-camera video traffic.
+function refreshPreviewSnapshots() {
+  for (const entry of Object.values(cards)) {
+    if (entry.previewImg && ["running", "starting"].includes(entry.cam.status.state)) {
+      entry.previewImg.src = `/api/cameras/${entry.cam.id}/snapshot.jpg?t=${Date.now()}`;
+    }
+  }
 }
 
 async function loadCameras() {
@@ -114,14 +141,12 @@ async function loadCameras() {
       existing.badgeEl.innerHTML = "";
       existing.badgeEl.appendChild(el("span", { class: "dot" }));
       existing.badgeEl.appendChild(document.createTextNode(statusLabel(cam.status.state)));
-      if (existing.hls) existing.hls.destroy();
-      existing.hls = attachVideo(existing.videoWrapEl, cam);
+      existing.previewImg = attachPreview(existing.videoWrapEl, cam);
     }
   });
 
   for (const id of Object.keys(cards)) {
     if (!seenIds.has(id)) {
-      if (cards[id].hls) cards[id].hls.destroy();
       cards[id].cardEl.remove();
       delete cards[id];
     }
@@ -229,6 +254,7 @@ document.getElementById("btn-logout").addEventListener("click", logout);
   await loadCameras();
   setInterval(loadCameras, 15000);
   setInterval(loadDisk, 30000);
+  setInterval(refreshPreviewSnapshots, 30000);
 })();
 </script>
 </body>

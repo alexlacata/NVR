@@ -124,6 +124,29 @@ a { color: var(--accent); text-decoration: none; }
 .cam-card video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 .cam-card .offline { color: var(--text-dim); font-size: 13px; text-align: center; padding: 8px; }
 
+.video-preview-link {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.video-preview-link img { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.video-preview-link .play-overlay {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  pointer-events: none;
+}
+.video-preview-link:hover .play-overlay { background: rgba(0, 0, 0, 0.7); }
+
 .cam-card .meta {
   display: flex;
   align-items: center;

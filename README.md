@@ -304,6 +304,9 @@ ouvrent, dans un nouvel onglet, l'interface web native de la caméra
 la convention classique du ".1" de la passerelle du même sous-réseau que
 la caméra). L'adresse est déduite automatiquement de l'URL déjà
 configurée pour la caméra (RTSP/ONVIF) — rien à saisir en plus pour ça.
+Ces mêmes liens apparaissent aussi directement sur la page de chaque
+caméra (pas seulement sur le tableau de bord), juste sous le direct
+vidéo.
 
 **Connexion automatique (quand les identifiants sont connus)** : si vous
 renseignez les identifiants de connexion de la caméra et/ou du routeur
@@ -740,6 +743,14 @@ bout, HTTP simple reste raisonnable ; ces deux options s'adressent surtout
 
 ## Regarder depuis le téléphone
 
+- **Consommation de données du tableau de bord** : chaque vignette de
+  caméra y affiche une simple image fixe (rafraîchie environ toutes les
+  30 secondes), pas un direct vidéo en continu — ouvrir le tableau de
+  bord avec 10 caméras ne lance donc pas 10 flux vidéo simultanés. Cliquez
+  sur l'image (bouton **▶**) pour ouvrir cette caméra et lancer son vrai
+  direct vidéo, un flux à la fois. Utile en 4G, où lire N flux HLS en
+  parallèle juste pour afficher un tableau de bord consommerait vite un
+  forfait de données.
 - **Sur le même réseau Wi-Fi** : ouvrez `http://<ip-locale-du-serveur>:8000`
   dans le navigateur du téléphone.
 - **En scannant un QR code** : une fois connecté depuis un premier appareil,
