@@ -790,9 +790,19 @@ tient l'annuaire de tous vos boîtiers :
   puisque la joignabilité dépend d'où vous êtes à cet instant. Un système
   peut donc apparaître hors ligne depuis votre téléphone en 4G mais en
   ligne depuis l'ordinateur de la maison, et inversement.
-- **Cliquer sur l'adresse** ouvre l'interface de ce système dans un nouvel
-  onglet. Chaque boîtier reste totalement indépendant : pas de compte ni
-  de données partagées entre eux, uniquement ce carnet d'adresses.
+- **Cliquer sur l'adresse** (le « chemin distant ») ouvre l'interface de ce
+  système dans un nouvel onglet. Chaque boîtier reste totalement
+  indépendant : pas de compte ni de données partagées entre eux,
+  uniquement ce carnet d'adresses.
+- **La petite porte 🚪** à côté de l'adresse, quand elle apparaît, est un
+  « chemin root » distinct : un accès SSH/terminal à la machine derrière
+  ce système, pas à l'interface web du NVR. Même principe que l'accès SSH
+  des caméras et du routeur (voir plus haut) — juste un utilisateur et un
+  port, jamais de mot de passe stocké ni demandé. Renseignez-le à
+  l'ajout du système, ou modifiez-le à tout moment via les deux petits
+  champs "SSH" sous chaque entrée existante (réservé aux comptes avec la
+  permission *Gérer les paramètres serveur*) ; laissez le champ
+  utilisateur vide pour que la porte n'apparaisse pas.
 
 Ce n'est qu'un annuaire — il n'établit aucune connexion entre vos NVR ni
 ne centralise leurs caméras ; il vous fait juste gagner le temps de

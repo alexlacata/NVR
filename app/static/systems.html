@@ -47,6 +47,13 @@
           <div><label>Adresse (IP ou domaine)</label><input type="text" id="ns-url" placeholder="ex. 192.168.1.50:8000"></div>
         </div>
         <div><label>Notes (optionnel)</label><input type="text" id="ns-notes" placeholder="ex. Chalet, derriere le routeur 4G"></div>
+        <div class="hint">Acces SSH (optionnel, si vous pouvez atteindre la machine derriere ce systeme) : construit
+          un lien ssh:// et un bouton pour copier la commande - aucun mot de passe n'est demande ni stocke, vous le
+          saisissez vous-meme dans votre terminal.</div>
+        <div class="row">
+          <div><label>Utilisateur SSH</label><input type="text" id="ns-ssh-user" placeholder="root"></div>
+          <div><label>Port SSH</label><input type="text" inputmode="numeric" id="ns-ssh-port" placeholder="22"></div>
+        </div>
         <div class="error-msg" id="add-system-error"></div>
         <div><button type="submit" class="btn secondary">Ajouter le systeme</button></div>
       </form>
@@ -96,7 +103,17 @@ async function loadSystems() {
   systems.forEach((s) => {
     const badge = el("span", { class: "badge" });
     setBadge(badge, "checking");
-    const link = el("a", { href: s.url, target: "_blank", rel: "noopener" }, s.url);
+    // The address link is the "chemin distant" (opens this system's own
+    // web interface, wherever it is reachable from right now) - the door
+    // icon next to it, when an SSH user is configured, is a separate
+    // "root path" straight into the machine behind it, same ssh://
+    // + copy-command mechanic as the camera/router quick-access links.
+    let sshHost = null;
+    try { sshHost = new URL(s.url).hostname; } catch (e) {}
+    const sshDoor = sshHost ? sshLinkGroup(sshHost, s.ssh_username, s.ssh_port, "🚪") : null;
+    const link = el("div", { class: "device-link-group" }, [
+      el("a", { href: s.url, target: "_blank", rel: "noopener", class: "hint tabular" }, s.url),
+    ]);
 
     const delBtn = hasPermission("settings_manage") ? el("button", {
       class: "icon-btn del",
@@ -113,17 +130,52 @@ async function loadSystems() {
       },
     }, "🗑") : null;
 
-    const children = [
+    const addressRow = el("div", { class: "device-links", style: "padding:0;margin-top:2px" }, [link, sshDoor]);
+
+    const rowChildren = [
       el("div", { class: "rec-item" }, [
         el("div", { style: "min-width:0" }, [
           el("div", { style: "font-weight:600" }, s.name),
-          el("div", { class: "hint tabular", style: "margin-top:2px" }, [link]),
+          addressRow,
           s.notes ? el("div", { class: "hint", style: "margin-top:2px" }, s.notes) : null,
         ]),
         el("div", { class: "rec-actions", style: "align-items:center;gap:10px" }, [badge, delBtn]),
       ]),
     ];
-    listEl.appendChild(el("div", {}, children));
+
+    if (hasPermission("settings_manage")) {
+      const sshUserInput = el("input", { type: "text", value: s.ssh_username || "", placeholder: "utilisateur SSH" });
+      const sshPortInput = el("input", { type: "text", inputmode: "numeric", value: s.ssh_port || "", placeholder: "port (22)" });
+      const sshErrorEl = el("div", { class: "error-msg" });
+      const saveSsh = async () => {
+        sshErrorEl.textContent = "";
+        try {
+          const port = sshPortInput.value.trim();
+          if (port && !/^\d+$/.test(port)) throw new Error("Port SSH : doit etre un nombre entier.");
+          await apiJson(`/api/systems/${encodeURIComponent(s.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              ssh_username: sshUserInput.value || null,
+              ssh_port: port ? parseInt(port, 10) : null,
+            }),
+          });
+          toast(`Acces SSH de "${s.name}" mis a jour`);
+          await loadSystems();
+        } catch (e) {
+          sshErrorEl.textContent = e.message;
+        }
+      };
+      sshUserInput.addEventListener("change", saveSsh);
+      sshPortInput.addEventListener("change", saveSsh);
+      rowChildren.push(el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;padding:2px 13px 12px;align-items:center" }, [
+        el("span", { class: "hint" }, "SSH :"),
+        sshUserInput,
+        sshPortInput,
+        sshErrorEl,
+      ]));
+    }
+
+    listEl.appendChild(el("div", {}, rowChildren));
 
     checkReachable(s.url).then((reachable) => setBadge(badge, reachable ? "online" : "offline"));
   });
@@ -136,12 +188,15 @@ document.getElementById("add-system-form").addEventListener("submit", async (ev)
   const errorEl = document.getElementById("add-system-error");
   errorEl.textContent = "";
   try {
+    const sshPort = parseOptionalIntField("ns-ssh-port", "Port SSH");
     await apiJson("/api/systems", {
       method: "POST",
       body: JSON.stringify({
         name: document.getElementById("ns-name").value,
         url: document.getElementById("ns-url").value,
         notes: document.getElementById("ns-notes").value || null,
+        ssh_username: document.getElementById("ns-ssh-user").value || null,
+        ssh_port: sshPort,
       }),
     });
     document.getElementById("add-system-form").reset();

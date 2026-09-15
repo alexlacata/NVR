@@ -376,6 +376,12 @@ class RemoteSystemBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     url: str = Field(min_length=1, max_length=500)
     notes: Optional[str] = Field(default=None, max_length=300)
+    # SSH quick-access to the machine behind this system (username/port
+    # only, deliberately no password field - see Camera.ssh_username
+    # above for why). Rendered as a small door icon next to the system's
+    # address, distinct from that address's own "remote path" link.
+    ssh_username: Optional[str] = Field(default=None, max_length=200)
+    ssh_port: Optional[int] = Field(default=None, ge=1, le=65535)
 
     @field_validator("url")
     @classmethod
@@ -411,6 +417,8 @@ class RemoteSystemUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     url: Optional[str] = Field(default=None, min_length=1, max_length=500)
     notes: Optional[str] = Field(default=None, max_length=300)
+    ssh_username: Optional[str] = Field(default=None, max_length=200)
+    ssh_port: Optional[int] = Field(default=None, ge=1, le=65535)
 
 
 class RemoteSystem(RemoteSystemBase):

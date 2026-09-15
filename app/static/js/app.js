@@ -544,7 +544,7 @@ function deviceLinkGroup({ host, username, password, label, title, useHttps }) {
 // ssh:// link only does something if the browser/OS has an SSH client
 // registered as its handler (common on Linux/macOS, not guaranteed on
 // Windows) - the copy button is the reliable fallback either way.
-function sshLinkGroup(host, username, port) {
+function sshLinkGroup(host, username, port, label = "🖥 SSH") {
   if (!username) return null;
   const p = port || 22;
   const href = `ssh://${encodeURIComponent(username)}@${host}:${p}`;
@@ -554,7 +554,7 @@ function sshLinkGroup(host, username, port) {
     el("a", {
       href, target: "_blank", rel: "noopener", class: "device-link", onclick: stopBubble,
       title: "Ouvrir avec le client SSH associe a ce protocole sur votre systeme, s'il y en a un - aucun mot de passe n'est envoye, vous le saisissez normalement dans le terminal",
-    }, "🖥 SSH"),
+    }, label),
     el("button", {
       type: "button", class: "device-link-copy", title: "Copier la commande SSH",
       onclick: (e) => { stopBubble(e); copyTextToClipboard(command, "Commande copiee"); },

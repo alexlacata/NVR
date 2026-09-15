@@ -74,6 +74,34 @@ async def test_update_system(client):
 
 
 @pytest.mark.asyncio
+async def test_system_ssh_username_and_port_default_none_and_persist(client):
+    await _login_admin(client)
+    created = (await client.post("/api/systems", json={"name": "Maison", "url": "10.0.0.1"})).json()
+    assert created["ssh_username"] is None
+    assert created["ssh_port"] is None
+
+    resp = await client.patch(f"/api/systems/{created['id']}", json={"ssh_username": "root", "ssh_port": 2222})
+    assert resp.status_code == 200
+    assert resp.json()["ssh_username"] == "root"
+    assert resp.json()["ssh_port"] == 2222
+
+    resp = await client.get("/api/systems")
+    assert resp.json()[0]["ssh_username"] == "root"
+    assert resp.json()[0]["ssh_port"] == 2222
+
+
+@pytest.mark.asyncio
+async def test_system_ssh_fields_can_be_set_at_creation(client):
+    await _login_admin(client)
+    resp = await client.post("/api/systems", json={
+        "name": "Chalet", "url": "10.0.0.2", "ssh_username": "pi", "ssh_port": 22,
+    })
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["ssh_username"] == "pi"
+    assert resp.json()["ssh_port"] == 22
+
+
+@pytest.mark.asyncio
 async def test_update_missing_system_404(client):
     await _login_admin(client)
     resp = await client.patch("/api/systems/nope", json={"name": "X"})
