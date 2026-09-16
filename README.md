@@ -798,11 +798,14 @@ tient l'annuaire de tous vos boîtiers :
   « chemin root » distinct : un accès SSH/terminal à la machine derrière
   ce système, pas à l'interface web du NVR. Même principe que l'accès SSH
   des caméras et du routeur (voir plus haut) — juste un utilisateur et un
-  port, jamais de mot de passe stocké ni demandé. Renseignez-le à
-  l'ajout du système, ou modifiez-le à tout moment via les deux petits
-  champs "SSH" sous chaque entrée existante (réservé aux comptes avec la
+  port, jamais de mot de passe stocké ni demandé. Rien à saisir à
+  l'ajout : chaque système reçoit automatiquement `root` / port `22` (les
+  valeurs les plus courantes), donc la porte apparaît d'elle-même. Si
+  votre machine utilise un autre utilisateur/port, ou n'a pas de SSH du
+  tout, ajustez-le ou videz-le à tout moment via les deux petits champs
+  "SSH" sous chaque entrée existante (réservé aux comptes avec la
   permission *Gérer les paramètres serveur*) ; laissez le champ
-  utilisateur vide pour que la porte n'apparaisse pas.
+  utilisateur vide pour que la porte n'apparaisse plus.
 
 Ce n'est qu'un annuaire — il n'établit aucune connexion entre vos NVR ni
 ne centralise leurs caméras ; il vous fait juste gagner le temps de

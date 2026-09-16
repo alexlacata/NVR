@@ -74,31 +74,45 @@ async def test_update_system(client):
 
 
 @pytest.mark.asyncio
-async def test_system_ssh_username_and_port_default_none_and_persist(client):
+async def test_system_ssh_defaults_to_root_22_when_not_specified(client):
+    # Nothing to fill in for SSH to get a working door: leaving both fields
+    # out at creation still gets the near-universal root/22 default, not None.
     await _login_admin(client)
     created = (await client.post("/api/systems", json={"name": "Maison", "url": "10.0.0.1"})).json()
-    assert created["ssh_username"] is None
-    assert created["ssh_port"] is None
-
-    resp = await client.patch(f"/api/systems/{created['id']}", json={"ssh_username": "root", "ssh_port": 2222})
-    assert resp.status_code == 200
-    assert resp.json()["ssh_username"] == "root"
-    assert resp.json()["ssh_port"] == 2222
+    assert created["ssh_username"] == "root"
+    assert created["ssh_port"] == 22
 
     resp = await client.get("/api/systems")
     assert resp.json()[0]["ssh_username"] == "root"
-    assert resp.json()[0]["ssh_port"] == 2222
+    assert resp.json()[0]["ssh_port"] == 22
+
+
+@pytest.mark.asyncio
+async def test_system_ssh_defaults_can_be_overridden_or_cleared(client):
+    await _login_admin(client)
+    created = (await client.post("/api/systems", json={"name": "Maison", "url": "10.0.0.1"})).json()
+
+    resp = await client.patch(f"/api/systems/{created['id']}", json={"ssh_username": "pi", "ssh_port": 2222})
+    assert resp.status_code == 200
+    assert resp.json()["ssh_username"] == "pi"
+    assert resp.json()["ssh_port"] == 2222
+
+    # Explicitly clearing opts a system back out of showing the door icon.
+    resp = await client.patch(f"/api/systems/{created['id']}", json={"ssh_username": None, "ssh_port": None})
+    assert resp.status_code == 200
+    assert resp.json()["ssh_username"] is None
+    assert resp.json()["ssh_port"] is None
 
 
 @pytest.mark.asyncio
 async def test_system_ssh_fields_can_be_set_at_creation(client):
     await _login_admin(client)
     resp = await client.post("/api/systems", json={
-        "name": "Chalet", "url": "10.0.0.2", "ssh_username": "pi", "ssh_port": 22,
+        "name": "Chalet", "url": "10.0.0.2", "ssh_username": "pi", "ssh_port": 2200,
     })
     assert resp.status_code == 201, resp.text
     assert resp.json()["ssh_username"] == "pi"
-    assert resp.json()["ssh_port"] == 22
+    assert resp.json()["ssh_port"] == 2200
 
 
 @pytest.mark.asyncio

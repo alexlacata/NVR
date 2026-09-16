@@ -30,7 +30,10 @@
     propres cameras, son propre compte). L'etat en ligne/hors ligne est
     verifie depuis cet appareil : un systeme peut apparaitre hors ligne
     depuis votre telephone en 4G mais en ligne depuis le PC de la maison,
-    selon ce que cet appareil peut joindre en ce moment.
+    selon ce que cet appareil peut joindre en ce moment. Chaque systeme
+    ajoute recoit automatiquement une petite porte SSH (root, port 22 -
+    les valeurs les plus courantes), sans rien a remplir ; modifiez-la ou
+    videz-la sous chaque entree si besoin.
   </p>
 
   <div id="systems-list" class="rec-list"></div>
@@ -47,13 +50,6 @@
           <div><label>Adresse (IP ou domaine)</label><input type="text" id="ns-url" placeholder="ex. 192.168.1.50:8000"></div>
         </div>
         <div><label>Notes (optionnel)</label><input type="text" id="ns-notes" placeholder="ex. Chalet, derriere le routeur 4G"></div>
-        <div class="hint">Acces SSH (optionnel, si vous pouvez atteindre la machine derriere ce systeme) : construit
-          un lien ssh:// et un bouton pour copier la commande - aucun mot de passe n'est demande ni stocke, vous le
-          saisissez vous-meme dans votre terminal.</div>
-        <div class="row">
-          <div><label>Utilisateur SSH</label><input type="text" id="ns-ssh-user" placeholder="root"></div>
-          <div><label>Port SSH</label><input type="text" inputmode="numeric" id="ns-ssh-port" placeholder="22"></div>
-        </div>
         <div class="error-msg" id="add-system-error"></div>
         <div><button type="submit" class="btn secondary">Ajouter le systeme</button></div>
       </form>
@@ -188,15 +184,12 @@ document.getElementById("add-system-form").addEventListener("submit", async (ev)
   const errorEl = document.getElementById("add-system-error");
   errorEl.textContent = "";
   try {
-    const sshPort = parseOptionalIntField("ns-ssh-port", "Port SSH");
     await apiJson("/api/systems", {
       method: "POST",
       body: JSON.stringify({
         name: document.getElementById("ns-name").value,
         url: document.getElementById("ns-url").value,
         notes: document.getElementById("ns-notes").value || null,
-        ssh_username: document.getElementById("ns-ssh-user").value || null,
-        ssh_port: sshPort,
       }),
     });
     document.getElementById("add-system-form").reset();

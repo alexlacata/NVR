@@ -380,6 +380,10 @@ class RemoteSystemBase(BaseModel):
     # only, deliberately no password field - see Camera.ssh_username
     # above for why). Rendered as a small door icon next to the system's
     # address, distinct from that address's own "remote path" link.
+    # None here just means "unset" at the model level - RemoteSystemStore.
+    # create() fills both in with root/22 by default so the door appears
+    # with nothing to configure; explicitly clearing them afterwards (via
+    # update) opts a system back out.
     ssh_username: Optional[str] = Field(default=None, max_length=200)
     ssh_port: Optional[int] = Field(default=None, ge=1, le=65535)
 

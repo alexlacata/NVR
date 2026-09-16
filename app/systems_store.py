@@ -66,7 +66,17 @@ class RemoteSystemStore:
                 system_id = f"{base_id}-{suffix}"
             if payload.id and payload.id in systems:
                 raise DuplicateRemoteSystemId(payload.id)
-            system = RemoteSystem(id=system_id, **payload.model_dump(exclude={"id"}))
+            data = payload.model_dump(exclude={"id"})
+            # Defaulting to the near-universal "root"/22 here (rather than
+            # leaving both unset) means the SSH door appears out of the box
+            # with nothing to fill in - the rare system that has no SSH, or
+            # uses a different user/port, is edited or cleared afterwards
+            # via the inline fields, not configured up front.
+            if data.get("ssh_username") is None:
+                data["ssh_username"] = "root"
+            if data.get("ssh_port") is None:
+                data["ssh_port"] = 22
+            system = RemoteSystem(id=system_id, **data)
             systems[system_id] = system.model_dump(mode="json")
             self._write(systems)
             return system
