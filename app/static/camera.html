@@ -51,40 +51,49 @@
   <div id="recordings"></div>
 
   <div id="admin-settings-section">
-  <div class="section-title">Parametres de la camera</div>
+  <div class="section-title">Reglages de la camera</div>
+  <p class="hint" style="margin-top:0">Le nom et l'adresse ci-dessous suffisent pour demarrer. Tout le
+    reste (en dessous de "Enregistrer") est facultatif : n'ouvrez une section que si vous en avez besoin.</p>
   <details style="margin-bottom:10px">
     <summary style="cursor:pointer;color:var(--accent);font-size:13.5px;padding:8px 0">
-      Retrouver l'URL du flux : assistant par marque / detection ONVIF
+      Je ne connais pas l'adresse de ma camera : la trouver automatiquement
     </summary>
     <div id="stream-helpers"></div>
   </details>
   <div class="card">
     <form class="form-grid" id="edit-form">
       <div><label>Nom</label><input type="text" id="f-name"></div>
-      <div><label>Type de source</label>
+      <div><label>Type de connexion</label>
         <select id="f-type">
-          <option value="rtsp">RTSP (camera IP)</option>
-          <option value="rtmp">RTMP</option>
-          <option value="srt">SRT</option>
-          <option value="http">HTTP / MJPEG</option>
-          <option value="usb">USB / peripherique local</option>
-          <option value="test">Test (mire synthetique)</option>
+          <option value="rtsp">RTSP (la plupart des cameras IP)</option>
+          <option value="rtmp">RTMP (flux envoye par un boitier/encodeur)</option>
+          <option value="srt">SRT (liaison a faible qualite reseau, ex. 4G)</option>
+          <option value="http">HTTP / MJPEG (cameras plus anciennes)</option>
+          <option value="usb">USB (camera branchee directement au boitier)</option>
+          <option value="test">Test (mire, sans camera reelle)</option>
         </select>
+        <div class="hint">Pas sur ? Laissez sur RTSP et utilisez "trouver automatiquement" ci-dessus a
+          partir de la marque de votre camera.</div>
       </div>
-      <div><label>URL du flux principal (enregistrement)</label><input type="text" id="f-url"></div>
-      <div><label>URL du flux secondaire (direct, optionnel)</label><input type="text" id="f-live-url"></div>
+      <div><label>Adresse de la camera (pour l'enregistrement)</label><input type="text" id="f-url">
+        <div class="hint">Fournie par votre camera - consultez sa notice, ou utilisez l'assistant ci-dessus.</div>
+      </div>
+      <div><label>Adresse pour le direct, en qualite reduite (optionnel)</label><input type="text" id="f-live-url">
+        <div class="hint">Si votre camera propose une version allegee de son flux, indiquez-la ici pour un
+          direct plus fluide sur telephone. Laissez vide pour utiliser la meme adresse partout.</div>
+      </div>
       <div class="checkbox-row"><input type="checkbox" id="f-enabled"><label>Camera activee</label></div>
-      <div class="checkbox-row"><input type="checkbox" id="f-record"><label>Enregistrer</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="f-record"><label>Enregistrer en continu sur le disque</label></div>
 
       <details class="settings-section" id="section-schedule">
         <summary>
-          <span>Programmation de l'enregistrement</span>
+          <span>Horaires d'enregistrement</span>
           <span class="section-state" id="state-schedule"></span>
         </summary>
         <div class="settings-section-body">
-          <div class="hint">Laissez vide pour un enregistrement continu tant que "Enregistrer" est coche.
-            Sinon, choisissez un preset ou cliquez (glissez pour peindre plusieurs cases) sur la grille pour
-            n'enregistrer qu'a certaines heures.</div>
+          <div class="hint">Laissez sur "Toujours" pour un enregistrement continu tant que "Enregistrer" est
+            coche. Sinon, choisissez un bouton ci-dessous, ou cliquez (glissez pour plusieurs cases) sur la
+            grille pour n'enregistrer qu'a certaines heures.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
             <button type="button" class="btn secondary" id="sched-always">Toujours</button>
             <button type="button" class="btn secondary" id="sched-day">Jour (7h-20h)</button>
@@ -98,50 +107,61 @@
 
       <details class="settings-section" id="section-bandwidth">
         <summary>
-          <span>Bande passante du direct (4G / liaison limitee)</span>
+          <span>Economiser les donnees du direct (4G / connexion limitee)</span>
           <span class="section-state" id="state-bandwidth"></span>
         </summary>
         <div class="settings-section-body">
+          <div class="hint">Reduit la qualite de l'image affichee en direct pour consommer moins de donnees
+            sur une connexion limitee (4G, satellite...) ; l'enregistrement sur le disque reste toujours en
+            pleine qualite. Laissez les deux champs vides si votre connexion est illimitee.</div>
           <div class="row">
-            <div><label>Bitrate maximum du direct (kbps)</label><input type="text" inputmode="numeric" id="f-bitrate" placeholder="ex. 800 (vide = illimite)"></div>
-            <div><label>Resolution du direct</label>
+            <div><label>Debit maximum autorise (kilobits/seconde)</label><input type="text" inputmode="numeric" id="f-bitrate" placeholder="ex. 800 (vide = illimite)">
+              <div class="hint">Plus le nombre est petit, moins ca consomme mais moins l'image est nette. 800 convient bien pour de la 4G.</div>
+            </div>
+            <div><label>Taille de l'image en direct</label>
               <select id="f-scale">
                 <option value="">Originale (pas de limite)</option>
                 <option value="1920x1080">1920x1080 (Full HD)</option>
                 <option value="1280x720">1280x720 (HD)</option>
-                <option value="854x480">854x480 (SD)</option>
-                <option value="640x360">640x360</option>
-                <option value="426x240">426x240 (tres faible debit)</option>
+                <option value="854x480">854x480 (qualite standard)</option>
+                <option value="640x360">640x360 (basse qualite)</option>
+                <option value="426x240">426x240 (tres basse qualite, tres peu de donnees)</option>
               </select>
             </div>
           </div>
-          <div class="hint">Force un reencodage du direct pour tenir dans une liaison 4G/Peplink limitee ; l'enregistrement reste toujours en pleine qualite.</div>
         </div>
       </details>
 
       <details class="settings-section" id="section-thumbnails">
         <summary>
-          <span>Vignettes (ligne du temps)</span>
+          <span>Images d'apercu sur la ligne du temps</span>
           <span class="section-state" id="state-thumbnails"></span>
         </summary>
         <div class="settings-section-body">
-          <div><label>Intervalle entre deux vignettes (secondes)</label><input type="text" inputmode="numeric" id="f-thumb-interval" placeholder="ex. 60 (vide = valeur par defaut du serveur)"></div>
-          <div class="hint">Les vignettes sont extraites des enregistrements deja sur le disque (pas de connexion supplementaire a la camera) et alimentent la ligne du temps ci-dessus.</div>
+          <div class="hint">Ces petites images apparaissent sous la ligne du temps pour vous aider a
+            retrouver un moment sans tout regarder. Extraites des enregistrements deja sur le disque, sans
+            connexion supplementaire a la camera. La valeur par defaut convient dans la plupart des cas.</div>
+          <div><label>Frequence des images d'apercu (secondes)</label><input type="text" inputmode="numeric" id="f-thumb-interval" placeholder="ex. 60 (vide = valeur par defaut)"></div>
         </div>
       </details>
 
       <details class="settings-section" id="section-ptz">
         <summary>
-          <span>PTZ (pan / tilt / zoom)</span>
+          <span>Camera motorisee : zoom et rotation a distance (PTZ)</span>
           <span class="section-state" id="state-ptz"></span>
         </summary>
         <div class="settings-section-body">
-          <div class="checkbox-row"><input type="checkbox" id="f-ptz-enabled"><label>Camera PTZ (pilotage ONVIF)</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="f-ptz-enabled"><label>Cette camera peut etre orientee et zoomee a distance</label></div>
+          <div class="hint">Uniquement si votre camera a un moteur integre pour bouger et zoomer (souvent
+            appelees cameras "PTZ" ou "dome motorise"). La plupart des cameras fixes n'en ont pas - dans ce
+            cas, laissez decoche.</div>
           <div id="ptz-fields">
-            <div><label>URL du service ONVIF</label><input type="text" id="f-onvif-url" placeholder="http://192.168.1.51:8080/onvif/device_service"></div>
+            <div><label>Adresse de pilotage de la camera</label><input type="text" id="f-onvif-url" placeholder="http://192.168.1.51:8080/onvif/device_service">
+              <div class="hint">Fournie par la camera pour la piloter a distance (norme ONVIF) - consultez sa notice, ou l'assistant de detection ci-dessus.</div>
+            </div>
             <div class="row">
-              <div><label>Utilisateur ONVIF</label><input type="text" id="f-onvif-user"></div>
-              <div><label>Mot de passe ONVIF</label><input type="password" id="f-onvif-pass" autocomplete="new-password"></div>
+              <div><label>Identifiant de pilotage</label><input type="text" id="f-onvif-user"></div>
+              <div><label>Mot de passe de pilotage</label><input type="password" id="f-onvif-pass" autocomplete="new-password"></div>
             </div>
           </div>
         </div>
@@ -149,33 +169,36 @@
 
       <details class="settings-section" id="section-web">
         <summary>
-          <span>Interface web de la camera</span>
+          <span>Page d'administration de la camera (site du fabricant)</span>
           <span class="section-state" id="state-web"></span>
         </summary>
         <div class="settings-section-body">
-          <div class="hint">Identifiants de connexion a l'interface d'administration native de la
-            camera (pas ceux du NVR) - utilises uniquement pour le lien d'acces rapide "Camera" sur
-            le tableau de bord. Laissez vide pour reutiliser les identifiants ONVIF ci-dessus s'ils
-            sont renseignes.</div>
+          <div class="hint">L'identifiant et le mot de passe que vous utilisez pour vous connecter
+            directement sur la camera elle-meme (pas sur cette application) - servent uniquement pour le
+            raccourci d'acces rapide "Camera" affiche sur le tableau de bord et cette page. Laissez vide
+            pour reutiliser l'identifiant de pilotage ci-dessus, s'il est renseigne.</div>
           <div class="row">
-            <div><label>Utilisateur (interface web)</label><input type="text" id="f-web-user"></div>
-            <div><label>Mot de passe (interface web)</label><input type="password" id="f-web-pass" autocomplete="new-password"></div>
+            <div><label>Identifiant</label><input type="text" id="f-web-user"></div>
+            <div><label>Mot de passe</label><input type="password" id="f-web-pass" autocomplete="new-password"></div>
           </div>
-          <div class="checkbox-row"><input type="checkbox" id="f-web-https"><label>Interface accessible en HTTPS (au lieu de HTTP)</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="f-web-https"><label>Cette page s'ouvre en HTTPS (au lieu de HTTP)</label></div>
+          <div class="hint">Cochez seulement si l'adresse de la camera commence par https:// - la plupart
+            des cameras grand public utilisent http://, donc laissez decoche si vous ne savez pas.</div>
         </div>
       </details>
 
       <details class="settings-section" id="section-ssh">
         <summary>
-          <span>Acces SSH</span>
+          <span>Acces technique avance (SSH)</span>
           <span class="section-state" id="state-ssh"></span>
         </summary>
         <div class="settings-section-body">
-          <div class="hint">Uniquement si la camera expose un serveur SSH (rare sur les cameras grand
-            public) - construit un lien ssh:// (fonctionne si votre systeme a un client SSH associe a
-            ce protocole) et un bouton pour copier la commande. Aucun mot de passe n'est demande ni
-            stocke ici : SSH n'a pas d'equivalent sur de l'authentification HTTP Basic, le saisir dans
-            un lien serait risque - vous le saisissez vous-meme dans votre terminal.</div>
+          <div class="hint"><strong>Vous pouvez ignorer cette section sans probleme</strong> si vous ne
+            savez pas ce qu'est SSH : elle ne sert a rien pour regarder ou enregistrer vos cameras
+            normalement. Elle permet seulement, pour les personnes a l'aise avec l'informatique, d'ouvrir
+            une ligne de commande sur l'appareil derriere cette camera - rare sur les cameras grand public.
+            Aucun mot de passe n'est demande ni stocke ici, vous le saisissez vous-meme dans votre
+            terminal.</div>
           <div class="row">
             <div><label>Utilisateur SSH</label><input type="text" id="f-ssh-user" placeholder="root"></div>
             <div><label>Port SSH</label><input type="text" inputmode="numeric" id="f-ssh-port" placeholder="22"></div>
@@ -189,7 +212,7 @@
           <span class="section-state" id="state-motion"></span>
         </summary>
         <div class="settings-section-body">
-          <div class="checkbox-row"><input type="checkbox" id="f-motion-enabled"><label>Activer la detection de mouvement</label></div>
+          <div class="checkbox-row"><input type="checkbox" id="f-motion-enabled"><label>Prevenir en cas de mouvement detecte</label></div>
           <div id="motion-fields">
             <div>
               <label>Sensibilite (<span id="motion-sensitivity-val">50</span>)</label>
@@ -197,8 +220,8 @@
             </div>
             <div class="hint">Plus la sensibilite est elevee, plus un petit changement suffit a declencher une detection.</div>
             <div class="hint" id="motion-status-hint"></div>
-            <label>Zones de masquage (exclues de la detection)</label>
-            <div class="hint">Cliquez sur les cases a exclure (ex. une route, des arbres) pour eviter les fausses detections a cet endroit.</div>
+            <label>Zones a ignorer (exclues de la detection)</label>
+            <div class="hint">Cliquez sur les cases a exclure (ex. une route, des arbres qui bougent au vent) pour eviter les fausses alertes a cet endroit.</div>
             <div id="motion-mask-editor" class="motion-mask-editor"></div>
           </div>
         </div>
@@ -848,8 +871,8 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
   const errorEl = document.getElementById("edit-error");
   errorEl.textContent = "";
   try {
-    const liveMaxBitrateKbps = parseOptionalIntField("f-bitrate", "Bitrate maximum du direct");
-    const thumbnailIntervalSeconds = parseOptionalIntField("f-thumb-interval", "Intervalle entre deux vignettes");
+    const liveMaxBitrateKbps = parseOptionalIntField("f-bitrate", "Debit maximum autorise");
+    const thumbnailIntervalSeconds = parseOptionalIntField("f-thumb-interval", "Frequence des images d'apercu");
     const sshPort = parseOptionalIntField("f-ssh-port", "Port SSH");
     await apiJson(`/api/cameras/${encodeURIComponent(camId)}`, {
       method: "PATCH",
@@ -897,13 +920,13 @@ function mountStreamHelpers() {
   const setUrl = (url) => {
     document.getElementById("f-url").value = url;
     document.getElementById("f-type").value = "rtsp";
-    toast("URL principale renseignee - pensez a cliquer sur Enregistrer");
+    toast("Adresse renseignee - pensez a cliquer sur Enregistrer");
   };
   host.appendChild(buildBrandUrlWidget({
     onUseUrl: setUrl,
     onUseLiveUrl: (url) => {
       document.getElementById("f-live-url").value = url;
-      toast("URL secondaire renseignee - pensez a cliquer sur Enregistrer");
+      toast("Adresse du direct renseignee - pensez a cliquer sur Enregistrer");
     },
   }));
   host.appendChild(buildOnvifDiscoveryWidget({ onUseUrl: setUrl }));

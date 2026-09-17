@@ -170,23 +170,23 @@ function openAddModal() {
 
   const nameInput = el("input", { type: "text", required: "" });
   const typeSelect = el("select", {}, [
-    el("option", { value: "rtsp" }, "RTSP (camera IP)"),
-    el("option", { value: "rtmp" }, "RTMP"),
-    el("option", { value: "srt" }, "SRT"),
-    el("option", { value: "http" }, "HTTP / MJPEG"),
-    el("option", { value: "usb" }, "USB / peripherique local"),
-    el("option", { value: "test" }, "Test (mire synthetique)"),
+    el("option", { value: "rtsp" }, "RTSP (la plupart des cameras IP)"),
+    el("option", { value: "rtmp" }, "RTMP (flux envoye par un boitier/encodeur)"),
+    el("option", { value: "srt" }, "SRT (liaison a faible qualite reseau, ex. 4G)"),
+    el("option", { value: "http" }, "HTTP / MJPEG (cameras plus anciennes)"),
+    el("option", { value: "usb" }, "USB (camera branchee directement au boitier)"),
+    el("option", { value: "test" }, "Test (mire, sans camera reelle)"),
   ]);
   const urlInput = el("input", { type: "text", placeholder: "rtsp://utilisateur:motdepasse@192.168.1.50:554/stream1" });
-  const liveUrlInput = el("input", { type: "text", placeholder: "(optionnel) sous-flux basse resolution pour le direct" });
+  const liveUrlInput = el("input", { type: "text", placeholder: "(optionnel) version allegee du flux pour le direct" });
   const recordCheckbox = el("input", { type: "checkbox", checked: "" });
 
   const brandWidget = buildBrandUrlWidget({
-    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("URL principale renseignee"); },
-    onUseLiveUrl: (url) => { liveUrlInput.value = url; toast("URL secondaire renseignee"); },
+    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("Adresse renseignee"); },
+    onUseLiveUrl: (url) => { liveUrlInput.value = url; toast("Adresse du direct renseignee"); },
   });
   const onvifWidget = buildOnvifDiscoveryWidget({
-    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("URL renseignee depuis ONVIF"); },
+    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("Adresse trouvee automatiquement"); },
   });
 
   const form = el("form", { class: "form-grid", onsubmit: async (ev) => {
@@ -209,14 +209,16 @@ function openAddModal() {
       errorEl.textContent = e.message;
     }
   }}, [
-    el("div", {}, [el("label", {}, "Nom"), nameInput]),
-    el("div", {}, [el("label", {}, "Type de source"), typeSelect]),
-    el("div", {}, [el("label", {}, "URL du flux principal (enregistrement)"), urlInput,
+    el("div", {}, [el("label", {}, "Nom"), nameInput,
+      el("div", { class: "hint" }, "Un nom pour la reconnaitre facilement, ex. \"Entree\" ou \"Jardin\".")]),
+    el("div", {}, [el("label", {}, "Type de connexion"), typeSelect,
+      el("div", { class: "hint" }, "Pas sur ? Laissez sur RTSP et utilisez l'assistant ci-dessous pour trouver l'adresse automatiquement.")]),
+    el("div", {}, [el("label", {}, "Adresse de la camera (pour l'enregistrement)"), urlInput,
       el("div", { class: "hint" }, "Une simple adresse IP (ex. 192.168.1.50 ou 192.168.1.50:554/stream1) suffit, rtsp:// est ajoute automatiquement.")]),
-    el("div", {}, [el("label", {}, "URL du flux secondaire (direct, optionnel)"), liveUrlInput,
-      el("div", { class: "hint" }, "Laisser vide pour utiliser le meme flux en direct et pour l'enregistrement.")]),
+    el("div", {}, [el("label", {}, "Adresse pour le direct, en qualite reduite (optionnel)"), liveUrlInput,
+      el("div", { class: "hint" }, "Laisser vide pour utiliser la meme adresse partout.")]),
     el("div", { class: "checkbox-row" }, [recordCheckbox, el("label", {}, "Enregistrer en continu sur le disque")]),
-    el("div", { class: "hint" }, "Le PTZ et la limite de bitrate se configurent ensuite sur la page de la camera."),
+    el("div", { class: "hint" }, "Les reglages plus avances (zoom motorise, detection de mouvement, economie de donnees...) se configurent ensuite sur la page de la camera - vous pourrez y revenir a tout moment."),
     errorEl,
     el("div", { class: "actions" }, [
       el("button", { type: "submit", class: "btn" }, "Ajouter"),
@@ -226,7 +228,7 @@ function openAddModal() {
 
   const helpers = el("details", { style: "margin:0 16px 4px" }, [
     el("summary", { style: "cursor:pointer;color:var(--accent);font-size:13.5px;padding:8px 0" },
-      "Je ne connais pas l'URL : assistant par marque / detection ONVIF"),
+      "Je ne connais pas l'adresse de ma camera : la trouver automatiquement"),
     brandWidget,
     onvifWidget,
   ]);

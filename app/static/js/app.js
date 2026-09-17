@@ -313,7 +313,7 @@ function buildBrandUrlWidget({ onUseUrl, onUseLiveUrl }) {
     hintEl.textContent = brand ? brand.hint : "";
     if (brand && !portInput.value) portInput.setAttribute("placeholder", String(brand.defaultPort));
     const url = currentUrl();
-    previewEl.textContent = url ? `URL generee : ${url}` : "";
+    previewEl.textContent = url ? `Adresse trouvee : ${url}` : "";
   }
   [brandSelect, hostInput, portInput, userInput, passInput, channelInput, subCk].forEach((elm) =>
     elm.addEventListener("input", refresh));
@@ -323,27 +323,27 @@ function buildBrandUrlWidget({ onUseUrl, onUseLiveUrl }) {
     const url = currentUrl();
     if (!url) { toast("Choisissez une marque et une adresse IP"); return; }
     onUseUrl(url);
-  }}, "Utiliser pour le flux principal");
+  }}, "Utiliser pour l'enregistrement");
   const useLiveBtn = el("button", { type: "button", class: "btn secondary", onclick: () => {
     const url = currentUrl();
     if (!url) { toast("Choisissez une marque et une adresse IP"); return; }
     onUseLiveUrl(url);
-  }}, "Utiliser pour le flux secondaire");
+  }}, "Utiliser pour le direct");
 
   return el("div", { class: "card field-grid" }, [
-    el("div", { class: "section-title", style: "margin:0" }, "Assistant d'URL par marque"),
+    el("div", { class: "section-title", style: "margin:0" }, "Trouver l'adresse selon la marque de ma camera"),
     el("div", {}, [ el("label", {}, "Marque"), brandSelect ]),
     el("div", { class: "row" }, [
-      el("div", { style: "flex:2" }, [ el("label", {}, "Adresse IP"), hostInput ]),
-      el("div", { style: "flex:1" }, [ el("label", {}, "Port"), portInput ]),
+      el("div", { style: "flex:2" }, [ el("label", {}, "Adresse de la camera sur votre reseau"), hostInput ]),
+      el("div", { style: "flex:1" }, [ el("label", {}, "Port (deja rempli, changez seulement si besoin)"), portInput ]),
     ]),
     el("div", { class: "row" }, [
       el("div", {}, [ el("label", {}, "Utilisateur"), userInput ]),
       el("div", {}, [ el("label", {}, "Mot de passe"), passInput ]),
     ]),
     el("div", { class: "row", style: "align-items:flex-end" }, [
-      el("div", { style: "flex:0" }, [ el("label", {}, "Canal"), channelInput ]),
-      el("div", { class: "checkbox-row", style: "padding-bottom:10px" }, [ subCk, el("label", {}, "Sous-flux (basse resolution)") ]),
+      el("div", { style: "flex:0" }, [ el("label", {}, "Canal (1, sauf boitier a plusieurs cameras)"), channelInput ]),
+      el("div", { class: "checkbox-row", style: "padding-bottom:10px" }, [ subCk, el("label", {}, "Version allegee du flux (basse resolution)") ]),
     ]),
     hintEl,
     previewEl,
@@ -364,7 +364,7 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
   async function probe() {
     errorEl.textContent = "";
     resultsEl.innerHTML = "";
-    if (!urlInput.value.trim()) { errorEl.textContent = "URL ONVIF requise"; return; }
+    if (!urlInput.value.trim()) { errorEl.textContent = "L'adresse de pilotage de la camera est requise"; return; }
     resultsEl.appendChild(el("div", { class: "hint" }, "Interrogation de la camera..."));
     try {
       const profiles = await apiJson("/api/onvif/probe", {
@@ -377,7 +377,7 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
           el("span", {}, `${p.name}${p.resolution ? " · " + p.resolution : ""}`),
           p.stream_uri
             ? el("button", { type: "button", class: "btn secondary", onclick: () => onUseUrl(p.stream_uri) }, "Utiliser")
-            : el("span", { class: "hint" }, "URL indisponible"),
+            : el("span", { class: "hint" }, "Adresse indisponible"),
         ]));
       });
     } catch (e) {
@@ -394,7 +394,7 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
       const devices = await apiJson("/api/onvif/discover", { method: "POST" });
       resultsEl.innerHTML = "";
       if (devices.length === 0) {
-        resultsEl.appendChild(el("div", { class: "hint" }, "Aucune camera ONVIF trouvee sur le reseau local."));
+        resultsEl.appendChild(el("div", { class: "hint" }, "Aucune camera trouvee sur le reseau local."));
         return;
       }
       devices.forEach((d) => {
@@ -404,7 +404,7 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
         resultsEl.appendChild(el("div", { class: "rec-item" }, [
           el("span", {}, label),
           xaddr
-            ? el("button", { type: "button", class: "btn secondary", onclick: () => { urlInput.value = xaddr; toast("URL ONVIF renseignee, cliquez sur Detecter les flux"); } }, "Utiliser")
+            ? el("button", { type: "button", class: "btn secondary", onclick: () => { urlInput.value = xaddr; toast("Adresse renseignee, cliquez sur \"Trouver l'adresse de cette camera\""); } }, "Utiliser")
             : null,
         ]));
       });
@@ -415,16 +415,16 @@ function buildOnvifDiscoveryWidget({ onUseUrl }) {
   }
 
   return el("div", { class: "card field-grid" }, [
-    el("div", { class: "section-title", style: "margin:0" }, "Detection ONVIF"),
-    el("div", { class: "hint", style: "margin-bottom:8px" }, "Fonctionne avec toute camera compatible ONVIF, quelle que soit la marque (Hikvision, Uniview, Dahua, Axis, Reolink, Amcrest, Annke, Vivotek, Lorex, Swann, Hanwha, Bosch, Panasonic, ...) - interroge la camera directement plutot que de deviner l'URL."),
-    el("div", {}, [ el("label", {}, "URL du service ONVIF"), urlInput ]),
+    el("div", { class: "section-title", style: "margin:0" }, "Trouver la camera automatiquement"),
+    el("div", { class: "hint", style: "margin-bottom:8px" }, "Fonctionne avec la plupart des cameras recentes, quelle que soit la marque - interroge la camera directement pour trouver son adresse, plutot que de la deviner."),
+    el("div", {}, [ el("label", {}, "Adresse de pilotage de la camera (ONVIF)"), urlInput ]),
     el("div", { class: "row" }, [
       el("div", {}, [ el("label", {}, "Utilisateur"), userInput ]),
       el("div", {}, [ el("label", {}, "Mot de passe"), passInput ]),
     ]),
     el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, [
-      el("button", { type: "button", class: "btn secondary", onclick: probe }, "Detecter les flux"),
-      el("button", { type: "button", class: "btn secondary", onclick: scanNetwork }, "Rechercher sur le reseau"),
+      el("button", { type: "button", class: "btn secondary", onclick: probe }, "Trouver l'adresse de cette camera"),
+      el("button", { type: "button", class: "btn secondary", onclick: scanNetwork }, "Chercher toutes les cameras sur mon reseau"),
     ]),
     errorEl,
     resultsEl,

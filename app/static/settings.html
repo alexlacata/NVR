@@ -99,8 +99,8 @@
     <div class="card" style="padding:16px 18px">
       <p class="hint" style="margin-top:0">
         Un administrateur a toujours acces a tout. Un lecteur peut se voir accorder des
-        permissions precises (gerer les cameras, piloter le PTZ, supprimer ou
-        telecharger des enregistrements, gerer les parametres serveur) sans devenir
+        permissions precises (gerer les cameras, orienter les cameras motorisees, supprimer ou
+        telecharger des enregistrements, gerer les reglages du serveur) sans devenir
         administrateur - seul un administrateur peut gerer les comptes.
       </p>
       <div id="users-list" class="rec-list"></div>
@@ -133,28 +133,52 @@
 
   <div id="settings-section" hidden>
 
-    <div class="section-title">Parametres serveur</div>
+    <div class="section-title">Reglages du serveur</div>
     <div class="card" style="padding:16px 18px">
       <form class="form-grid" id="server-form">
         <div class="row">
-          <div><label>Retention des enregistrements (jours)</label><input type="text" inputmode="numeric" id="s-retention-days"></div>
-          <div><label>Espace disque libre minimum (%)</label><input type="text" inputmode="numeric" id="s-min-free-disk"></div>
+          <div><label>Conserver les enregistrements pendant (jours)</label><input type="text" inputmode="numeric" id="s-retention-days"></div>
+          <div><label>Espace disque libre minimum a garder (%)</label><input type="text" inputmode="numeric" id="s-min-free-disk"></div>
         </div>
-        <div class="hint">Sous ce seuil, les enregistrements les plus anciens sont purges automatiquement.</div>
+        <div class="hint">Passe ce nombre de jours, ou sous ce seuil d'espace libre, les enregistrements les plus anciens sont supprimes automatiquement pour faire de la place.</div>
 
-        <div class="row">
-          <div><label>Duree d'un fichier d'enregistrement (secondes)</label><input type="text" inputmode="numeric" id="s-segment-seconds"></div>
-          <div><label>Taille des segments HLS (secondes)</label><input type="text" inputmode="numeric" id="s-hls-segment-seconds"></div>
-        </div>
-        <div class="row">
-          <div><label>Segments HLS conserves dans la playlist</label><input type="text" inputmode="numeric" id="s-hls-list-size"></div>
-          <div><label>Intervalle des vignettes par defaut (secondes)</label><input type="text" inputmode="numeric" id="s-thumb-interval"></div>
-        </div>
-        <div class="row">
-          <div><label>Frequence de verification des vignettes (secondes)</label><input type="text" inputmode="numeric" id="s-thumb-check-interval"></div>
-          <div><label>Frequence de verification de la retention (secondes)</label><input type="text" inputmode="numeric" id="s-retention-check-interval"></div>
-        </div>
-        <div class="hint">Les flux en cours redemarrent brievement apres l'enregistrement pour appliquer les nouveaux reglages.</div>
+        <details class="settings-section" id="section-server-advanced">
+          <summary>
+            <span>Reglages techniques avances</span>
+            <span class="section-state">Valeurs par defaut recommandees</span>
+          </summary>
+          <div class="settings-section-body">
+            <p class="hint" style="margin-top:0"><strong>Vous pouvez ignorer cette section :</strong> les valeurs
+              par defaut conviennent presque toujours. Elle ajuste le fonctionnement interne du serveur (comment
+              la video est decoupee et diffusee), pas ce que vous voyez a l'ecran.</p>
+            <div class="row">
+              <div><label>Duree de chaque fichier video enregistre (secondes)</label><input type="text" inputmode="numeric" id="s-segment-seconds">
+                <div class="hint">Un nouveau fichier demarre automatiquement toutes les X secondes (600 = 10 minutes par defaut), pour eviter un unique fichier enorme.</div>
+              </div>
+              <div><label>Longueur des morceaux du direct - HLS (secondes)</label><input type="text" inputmode="numeric" id="s-hls-segment-seconds">
+                <div class="hint">Concerne uniquement le direct sur telephone/navigateur, pas l'enregistrement.</div>
+              </div>
+            </div>
+            <div class="row">
+              <div><label>Nombre de morceaux du direct conserves</label><input type="text" inputmode="numeric" id="s-hls-list-size">
+                <div class="hint">Combien de ces morceaux restent disponibles pendant le direct.</div>
+              </div>
+              <div><label>Frequence des images d'apercu par defaut (secondes)</label><input type="text" inputmode="numeric" id="s-thumb-interval">
+                <div class="hint">Valeur de depart pour chaque camera - modifiable individuellement sur sa page.</div>
+              </div>
+            </div>
+            <div class="row">
+              <div><label>Frequence de creation des images d'apercu (secondes)</label><input type="text" inputmode="numeric" id="s-thumb-check-interval">
+                <div class="hint">A quelle vitesse le serveur reagit apres un enregistrement pour en extraire une image d'apercu.</div>
+              </div>
+              <div><label>Frequence de verification de l'espace disque (secondes)</label><input type="text" inputmode="numeric" id="s-retention-check-interval">
+                <div class="hint">A quelle vitesse le serveur reagit quand l'espace disque devient insuffisant.</div>
+              </div>
+            </div>
+            <div class="hint">Les cameras redemarrent brievement apres l'enregistrement pour appliquer les nouveaux reglages.</div>
+          </div>
+        </details>
+
         <div class="error-msg" id="server-error"></div>
         <div><button type="submit" class="btn">Enregistrer les parametres</button></div>
       </form>
@@ -169,22 +193,31 @@
         Home Assistant, ntfy, IFTTT...) et/ou par e-mail.
       </p>
       <form class="form-grid" id="notif-form">
-        <label class="checkbox-row"><input type="checkbox" id="n-webhook-enabled"> Activer le webhook</label>
-        <div><label>URL du webhook</label><input type="text" id="n-webhook-url" placeholder="https://exemple.com/mon-webhook"></div>
+        <label class="checkbox-row"><input type="checkbox" id="n-webhook-enabled"> Activer l'alerte technique (webhook)</label>
+        <div><label>Adresse de reception (webhook)</label><input type="text" id="n-webhook-url" placeholder="https://exemple.com/mon-webhook">
+          <div class="hint">Un lien fourni par un service comme Discord, Slack, Home Assistant, ntfy ou IFTTT
+            pour recevoir l'alerte automatiquement - consultez la documentation de ce service pour l'obtenir.
+            Reserve aux utilisateurs a l'aise avec ce type d'outil ; ignorez si vous ne savez pas de quoi il
+            s'agit.</div>
+        </div>
 
-        <label class="checkbox-row" style="margin-top:8px"><input type="checkbox" id="n-email-enabled"> Activer l'e-mail</label>
+        <label class="checkbox-row" style="margin-top:8px"><input type="checkbox" id="n-email-enabled"> Activer l'alerte par e-mail</label>
+        <div class="hint">Les informations ci-dessous sont fournies par votre service de messagerie (Gmail,
+          Outlook, l'hebergeur de votre nom de domaine...) - cherchez "parametres SMTP" dans son aide si vous
+          ne les avez pas sous la main.</div>
         <div class="row">
-          <div><label>Serveur SMTP</label><input type="text" id="n-smtp-host" placeholder="smtp.exemple.com"></div>
+          <div><label>Serveur d'envoi (SMTP)</label><input type="text" id="n-smtp-host" placeholder="smtp.exemple.com"></div>
           <div><label>Port</label><input type="text" inputmode="numeric" id="n-smtp-port" placeholder="587"></div>
         </div>
         <div class="row">
-          <div><label>Utilisateur SMTP</label><input type="text" id="n-smtp-user"></div>
-          <div><label>Mot de passe SMTP</label><input type="password" id="n-smtp-pass" autocomplete="new-password"></div>
+          <div><label>Identifiant</label><input type="text" id="n-smtp-user"></div>
+          <div><label>Mot de passe</label><input type="password" id="n-smtp-pass" autocomplete="new-password"></div>
         </div>
-        <label class="checkbox-row"><input type="checkbox" id="n-smtp-tls"> Utiliser STARTTLS</label>
+        <label class="checkbox-row"><input type="checkbox" id="n-smtp-tls"> Connexion securisee (STARTTLS)</label>
+        <div class="hint">Laissez coche, sauf indication contraire de votre service de messagerie.</div>
         <div class="row">
-          <div><label>Adresse expediteur</label><input type="text" id="n-smtp-from" placeholder="nvr@exemple.com"></div>
-          <div><label>Destinataire(s) (separes par des virgules)</label><input type="text" id="n-smtp-to" placeholder="moi@exemple.com"></div>
+          <div><label>Adresse expediteur (celle qui enverra l'alerte)</label><input type="text" id="n-smtp-from" placeholder="nvr@exemple.com"></div>
+          <div><label>Adresse(s) qui recoivent l'alerte (separees par des virgules)</label><input type="text" id="n-smtp-to" placeholder="moi@exemple.com"></div>
         </div>
 
         <div class="hint" style="margin-top:8px">Types d'alertes</div>
@@ -216,7 +249,8 @@
           <div><label>Utilisateur</label><input type="text" id="r-user"></div>
           <div><label>Mot de passe</label><input type="password" id="r-pass" autocomplete="new-password"></div>
         </div>
-        <div class="checkbox-row"><input type="checkbox" id="r-https"><label>Interface accessible en HTTPS (au lieu de HTTP)</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="r-https"><label>Cette page s'ouvre en HTTPS (au lieu de HTTP)</label></div>
+        <div class="hint">Cochez seulement si l'adresse du routeur commence par https:// - laissez decoche si vous ne savez pas.</div>
         <div class="hint">Le lien "Routeur" du tableau de bord devine l'adresse du routeur
           (le ".1" du reseau de chaque camera) - laissez le champ ci-dessous vide pour
           garder cette deduction automatique, ou indiquez l'adresse exacte si elle est
@@ -224,13 +258,23 @@
         <div class="row">
           <div><label>Adresse IP du routeur (optionnel)</label><input type="text" id="r-ip-override" placeholder="192.168.1.1"></div>
         </div>
-        <div class="hint">Acces SSH (optionnel, si votre routeur en expose un) : construit un lien
-          ssh:// et un bouton pour copier la commande - aucun mot de passe n'est demande ni stocke,
-          vous le saisissez vous-meme dans votre terminal.</div>
-        <div class="row">
-          <div><label>Utilisateur SSH</label><input type="text" id="r-ssh-user" placeholder="root"></div>
-          <div><label>Port SSH</label><input type="text" inputmode="numeric" id="r-ssh-port" placeholder="22"></div>
-        </div>
+        <details class="settings-section" id="section-router-ssh">
+          <summary>
+            <span>Acces technique avance (SSH)</span>
+            <span class="section-state">Reserve aux utilisateurs experimentes</span>
+          </summary>
+          <div class="settings-section-body">
+            <div class="hint"><strong>Vous pouvez ignorer cette section sans probleme</strong> si vous ne
+              savez pas ce qu'est SSH. Elle permet, pour les personnes a l'aise avec l'informatique,
+              d'ouvrir une ligne de commande sur le routeur - certains routeurs avances (OpenWrt, pfSense...)
+              l'exposent, contrairement a la plupart des routeurs grand public. Aucun mot de passe n'est
+              demande ni stocke ici, vous le saisissez vous-meme dans votre terminal.</div>
+            <div class="row">
+              <div><label>Utilisateur SSH</label><input type="text" id="r-ssh-user" placeholder="root"></div>
+              <div><label>Port SSH</label><input type="text" inputmode="numeric" id="r-ssh-port" placeholder="22"></div>
+            </div>
+          </div>
+        </details>
         <div class="error-msg" id="router-error"></div>
         <div><button type="submit" class="btn">Enregistrer les identifiants du routeur</button></div>
       </form>
@@ -257,11 +301,11 @@
 document.getElementById("btn-logout").addEventListener("click", logout);
 
 const PERMISSION_DEFS = [
-  { value: "cameras_manage", label: "Gerer les cameras" },
-  { value: "ptz_control", label: "Piloter le PTZ" },
+  { value: "cameras_manage", label: "Gerer les cameras (ajouter, modifier, supprimer)" },
+  { value: "ptz_control", label: "Orienter/zoomer les cameras motorisees (PTZ)" },
   { value: "recordings_delete", label: "Supprimer des enregistrements" },
   { value: "recordings_download", label: "Telecharger des enregistrements" },
-  { value: "settings_manage", label: "Gerer les parametres serveur" },
+  { value: "settings_manage", label: "Gerer les reglages du serveur" },
 ];
 
 function permissionCheckboxes(selected, onChange) {
@@ -590,14 +634,14 @@ document.getElementById("server-form").addEventListener("submit", async (ev) => 
     await apiJson("/api/settings", {
       method: "PATCH",
       body: JSON.stringify({
-        retention_days: num("s-retention-days", "Retention des enregistrements"),
+        retention_days: num("s-retention-days", "Duree de conservation des enregistrements"),
         min_free_disk_percent: num("s-min-free-disk", "Espace disque libre minimum", { float: true }),
-        segment_seconds: num("s-segment-seconds", "Duree d'un fichier d'enregistrement"),
-        hls_segment_seconds: num("s-hls-segment-seconds", "Taille des segments HLS"),
-        hls_list_size: num("s-hls-list-size", "Segments HLS conserves dans la playlist"),
-        thumbnail_interval_seconds: num("s-thumb-interval", "Intervalle des vignettes par defaut"),
-        thumbnail_check_interval_seconds: num("s-thumb-check-interval", "Frequence de verification des vignettes"),
-        retention_check_interval_seconds: num("s-retention-check-interval", "Frequence de verification de la retention"),
+        segment_seconds: num("s-segment-seconds", "Duree de chaque fichier video enregistre"),
+        hls_segment_seconds: num("s-hls-segment-seconds", "Longueur des morceaux du direct"),
+        hls_list_size: num("s-hls-list-size", "Nombre de morceaux du direct conserves"),
+        thumbnail_interval_seconds: num("s-thumb-interval", "Frequence des images d'apercu par defaut"),
+        thumbnail_check_interval_seconds: num("s-thumb-check-interval", "Frequence de creation des images d'apercu"),
+        retention_check_interval_seconds: num("s-retention-check-interval", "Frequence de verification de l'espace disque"),
       }),
     });
     toast("Parametres enregistres");
