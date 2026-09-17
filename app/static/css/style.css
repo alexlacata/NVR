@@ -258,6 +258,58 @@ details > .field-grid:first-of-type { margin-top: 10px; }
 .error-msg { color: var(--err); font-size: 14px; min-height: 18px; }
 .hint { color: var(--text-dim); font-size: 12px; margin-top: -6px; }
 
+/* Collapsible groups for optional/advanced settings (PTZ, SSH, motion...) -
+   collapsed by default so a form with many rarely-touched sections doesn't
+   read as one intimidating wall of fields; each auto-opens once if its
+   section is already configured (see initSettingsSections in camera.html),
+   so nothing already active hides from view. */
+.settings-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.settings-section > summary {
+  list-style: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.settings-section > summary::-webkit-details-marker { display: none; }
+.settings-section > summary::after {
+  content: "▸";
+  color: var(--text-dim);
+  font-weight: 400;
+  transition: transform .15s ease;
+  flex: none;
+  margin-left: auto;
+}
+.settings-section[open] > summary::after { transform: rotate(90deg); }
+.settings-section > summary .section-state {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.settings-section > .settings-section-body {
+  padding: 2px 14px 14px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+  margin-top: 2px;
+}
+.settings-section > .settings-section-body > label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
 .login-wrap {
   min-height: 100vh;
   display: flex;
@@ -290,20 +342,24 @@ details > .field-grid:first-of-type { margin-top: 10px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 6px;
   padding: 10px 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
 }
-.rec-item .rec-actions { display: flex; gap: 8px; }
+.rec-item .rec-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 .rec-item button.icon-btn {
   background: none;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
   font-size: 13px;
-  padding: 4px 8px;
+  padding: 6px 9px;
+  touch-action: manipulation;
+  white-space: nowrap;
 }
 .rec-item button.icon-btn:hover { color: var(--err); }
 

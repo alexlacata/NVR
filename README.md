@@ -295,6 +295,15 @@ Dans le formulaire d'ajout (et sur la page de chaque caméra), dépliez
 Le PTZ et la limite de bande passante du direct se configurent ensuite sur
 la page de la caméra (section *Bande passante du direct* et *PTZ*).
 
+Sur cette page, les réglages optionnels (programmation, bande passante,
+vignettes, PTZ, interface web, SSH, détection de mouvement) sont repliés
+par défaut - seuls le nom, le type, l'URL et les cases activée/enregistrer
+restent visibles d'emblée, pour ne pas noyer une configuration simple sous
+des champs rarement utilisés. Chaque section s'ouvre automatiquement une
+fois si elle est déjà configurée (ex. le PTZ reste ouvert si vous l'avez
+activé), et son intitulé indique son état en un coup d'œil sans avoir à
+cliquer.
+
 ### Accès direct à l'interface de la caméra et du routeur
 
 Sur le tableau de bord, chaque vignette de caméra affiche deux petits
