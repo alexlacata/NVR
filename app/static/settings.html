@@ -101,7 +101,9 @@
         Un administrateur a toujours acces a tout. Un lecteur peut se voir accorder des
         permissions precises (gerer les cameras, orienter les cameras motorisees, supprimer ou
         telecharger des enregistrements, gerer les reglages du serveur) sans devenir
-        administrateur - seul un administrateur peut gerer les comptes.
+        administrateur - seul un administrateur peut gerer les comptes. Un lecteur voit par
+        defaut toutes les cameras ; vous pouvez le limiter a certaines cameras seulement
+        (ex. la personne qui garde les enfants ne voit que la camera du salon).
       </p>
       <div id="users-list" class="rec-list"></div>
 
@@ -318,6 +320,75 @@ function permissionCheckboxes(selected, onChange) {
   });
 }
 
+// Every camera, fetched once (as admin, so always the full list regardless
+// of any per-user restriction) to build the "cameras accessibles"
+// checklists below - refreshed each time the admin opens/reloads this page.
+let allCameras = [];
+async function loadAllCamerasForAccessControl() {
+  try {
+    allCameras = await apiJson("/api/cameras");
+  } catch (e) {
+    allCameras = [];
+  }
+}
+
+function cameraCheckboxes(selectedIds, onChange) {
+  const selectedSet = new Set(selectedIds || []);
+  if (allCameras.length === 0) {
+    return [el("div", { class: "hint" }, "Aucune camera configuree pour l'instant.")];
+  }
+  return allCameras.map((cam) => {
+    const ck = el("input", { type: "checkbox" });
+    ck.checked = selectedSet.has(cam.id);
+    ck.addEventListener("change", () => onChange(cam.id, ck.checked));
+    return el("label", { class: "checkbox-row", style: "font-size:13px" }, [ck, cam.name]);
+  });
+}
+
+// Renders the "limiter l'acces a certaines cameras" block shared by an
+// existing user's row and the "add user" form: a toggle (off = every
+// camera, the default) that reveals a per-camera checklist once on.
+// `getIds`/`setIds` read/write the caller's own notion of the current
+// selection (null = unrestricted) since the two call sites persist
+// differently (PATCH immediately vs. accumulate until submit).
+function cameraAccessControls(getIds, setIds) {
+  const wrap = el("div", { style: "margin-top:6px" });
+  const restrictCk = el("input", { type: "checkbox" });
+  restrictCk.checked = getIds() !== null;
+  const listWrap = el("div", { style: "display:flex;flex-wrap:wrap;gap:12px;padding:8px 0 2px" });
+  const hintEl = el("div", { class: "hint" });
+
+  function renderList() {
+    listWrap.innerHTML = "";
+    listWrap.hidden = !restrictCk.checked;
+    hintEl.hidden = !restrictCk.checked;
+    if (!restrictCk.checked) return;
+    const ids = getIds() || [];
+    hintEl.textContent = ids.length === 0
+      ? "Aucune camera cochee : ce compte n'en verra aucune pour l'instant."
+      : "";
+    cameraCheckboxes(ids, (camId, checked) => {
+      const next = new Set(getIds() || []);
+      if (checked) next.add(camId); else next.delete(camId);
+      setIds(Array.from(next));
+      renderList();
+    }).forEach((row) => listWrap.appendChild(row));
+  }
+
+  restrictCk.addEventListener("change", () => {
+    setIds(restrictCk.checked ? [] : null);
+    renderList();
+  });
+  renderList();
+
+  wrap.appendChild(el("label", { class: "checkbox-row", style: "font-size:13px" }, [
+    restrictCk, "Limiter l'acces a certaines cameras (sinon : toutes)",
+  ]));
+  wrap.appendChild(listWrap);
+  wrap.appendChild(hintEl);
+  return wrap;
+}
+
 function renderAccessQrCode() {
   document.getElementById("qr-url").textContent = location.origin;
   new QRCode(document.getElementById("qr-code"), {
@@ -396,6 +467,27 @@ async function loadUsers() {
         }
       }));
       rowChildren.push(permsWrap);
+
+      const accessControls = cameraAccessControls(
+        () => u.allowed_camera_ids,
+        (ids) => { u.allowed_camera_ids = ids; },
+      );
+      // Save on every change (toggle or individual camera), same
+      // immediate-save pattern as the permission checkboxes above -
+      // cameraAccessControls only updates local state, this wraps it.
+      accessControls.addEventListener("change", async () => {
+        try {
+          await apiJson(`/api/users/${encodeURIComponent(u.username)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ allowed_camera_ids: u.allowed_camera_ids }),
+          });
+          toast(`Cameras accessibles de ${u.username} mises a jour`);
+        } catch (e) {
+          toast(e.message);
+          await loadUsers();
+        }
+      });
+      rowChildren.push(el("div", { style: "padding:0 13px 12px" }, [accessControls]));
     }
 
     listEl.appendChild(el("div", {}, rowChildren));
@@ -403,6 +495,7 @@ async function loadUsers() {
 }
 
 let nuPermissions = new Set(["ptz_control", "recordings_download"]);
+let nuAllowedCameraIds = null;
 function renderNuPermissions() {
   const wrap = document.getElementById("nu-permissions");
   wrap.innerHTML = "";
@@ -412,6 +505,10 @@ function renderNuPermissions() {
   permissionCheckboxes(Array.from(nuPermissions), (perm, checked) => {
     if (checked) nuPermissions.add(perm); else nuPermissions.delete(perm);
   }).forEach((row) => wrap.appendChild(row));
+  wrap.appendChild(cameraAccessControls(
+    () => nuAllowedCameraIds,
+    (ids) => { nuAllowedCameraIds = ids; },
+  ));
 }
 document.getElementById("nu-role").addEventListener("change", renderNuPermissions);
 renderNuPermissions();
@@ -428,10 +525,12 @@ document.getElementById("add-user-form").addEventListener("submit", async (ev) =
         password: document.getElementById("nu-password").value,
         role: document.getElementById("nu-role").value,
         permissions: Array.from(nuPermissions),
+        allowed_camera_ids: nuAllowedCameraIds,
       }),
     });
     document.getElementById("add-user-form").reset();
     nuPermissions = new Set(["ptz_control", "recordings_download"]);
+    nuAllowedCameraIds = null;
     renderNuPermissions();
     toast("Utilisateur ajoute");
     await loadUsers();
@@ -780,6 +879,8 @@ document.getElementById("btn-backup-run").addEventListener("click", async () => 
   await loadTotpStatus();
   if (isAdmin()) {
     document.getElementById("admin-only-section").hidden = false;
+    await loadAllCamerasForAccessControl();
+    renderNuPermissions(); // re-render now allCameras is populated
     await loadUsers();
   }
   if (hasPermission("settings_manage")) {

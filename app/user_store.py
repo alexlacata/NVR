@@ -106,6 +106,7 @@ class UserStore:
                 username=payload.username,
                 role=payload.role,
                 permissions=payload.permissions,
+                allowed_camera_ids=payload.allowed_camera_ids,
                 password_hash=pwd_context.hash(payload.password),
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
@@ -131,6 +132,12 @@ class UserStore:
                 updates["role"] = payload.role
             if payload.permissions is not None:
                 updates["permissions"] = payload.permissions
+            # allowed_camera_ids=None is a real, settable value ("back to
+            # unrestricted") - `is not None` would make that unreachable
+            # through the API, so this checks whether the field was
+            # actually sent instead of what it was sent as.
+            if "allowed_camera_ids" in payload.model_fields_set:
+                updates["allowed_camera_ids"] = payload.allowed_camera_ids
             if payload.password is not None:
                 updates["password_hash"] = pwd_context.hash(payload.password)
             merged = existing.model_copy(update=updates)

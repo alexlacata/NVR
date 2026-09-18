@@ -52,6 +52,37 @@ def test_update_role(store):
     assert updated.role == UserRole.admin
 
 
+def test_create_with_allowed_camera_ids(store):
+    user = store.create(UserCreate(
+        username="alice", password="s3cretpass", role=UserRole.viewer, allowed_camera_ids=["cam-a"],
+    ))
+    assert user.allowed_camera_ids == ["cam-a"]
+    assert store.get("alice").allowed_camera_ids == ["cam-a"]
+
+
+def test_default_allowed_camera_ids_is_none(store):
+    user = store.create(UserCreate(username="alice", password="s3cretpass"))
+    assert user.allowed_camera_ids is None
+
+
+def test_update_sets_allowed_camera_ids(store):
+    store.create(UserCreate(username="alice", password="s3cretpass"))
+    updated = store.update("alice", UserUpdate(allowed_camera_ids=["cam-a", "cam-b"]))
+    assert updated.allowed_camera_ids == ["cam-a", "cam-b"]
+
+
+def test_update_with_explicit_null_clears_allowed_camera_ids(store):
+    store.create(UserCreate(username="alice", password="s3cretpass", allowed_camera_ids=["cam-a"]))
+    updated = store.update("alice", UserUpdate(allowed_camera_ids=None))
+    assert updated.allowed_camera_ids is None
+
+
+def test_update_without_the_field_leaves_allowed_camera_ids_untouched(store):
+    store.create(UserCreate(username="alice", password="s3cretpass", allowed_camera_ids=["cam-a"]))
+    updated = store.update("alice", UserUpdate(role=UserRole.viewer))
+    assert updated.allowed_camera_ids == ["cam-a"]
+
+
 def test_delete(store):
     store.create(UserCreate(username="alice", password="s3cretpass"))
     store.delete("alice")

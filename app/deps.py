@@ -10,7 +10,7 @@ from app.backup import BackupStatusTracker
 from app.config import Settings
 from app.ffmpeg_manager import StreamManager
 from app.login_throttle import LoginThrottle
-from app.models import Permission, User, UserRole, has_permission
+from app.models import Permission, User, UserRole, can_access_camera, has_permission
 from app.motion import MotionRegistry
 from app.notification_settings_store import NotificationSettingsStore
 from app.notifier import Notifier
@@ -112,6 +112,15 @@ def get_current_jti(request: Request) -> Optional[str]:
     auth_service: AuthService = request.app.state.auth_service
     token = _extract_token(request)
     return auth_service.session_id_from_token(token) if token else None
+
+
+def ensure_camera_access(user: User, camera_id: str) -> None:
+    """Raises 404 - not 403 - when `user` is a viewer restricted to a set of
+    cameras that doesn't include `camera_id`, so a restricted account can't
+    tell "exists but I can't see it" apart from "doesn't exist" (same
+    detail text CameraNotFound already uses for the latter)."""
+    if not can_access_camera(user, camera_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera introuvable")
 
 
 def require_admin(request: Request) -> User:

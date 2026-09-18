@@ -7,8 +7,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.deps import get_motion_registry, get_store, require_auth
-from app.models import MOTION_GRID_COLS, MOTION_GRID_ROWS
+from app.deps import ensure_camera_access, get_motion_registry, get_store, require_auth
+from app.models import MOTION_GRID_COLS, MOTION_GRID_ROWS, User
 from app.motion import MotionRegistry
 from app.store import CameraNotFound, CameraStore
 
@@ -35,7 +35,9 @@ def get_motion_status(
     camera_id: str,
     store: CameraStore = Depends(get_store),
     registry: MotionRegistry = Depends(get_motion_registry),
+    user: User = Depends(require_auth),
 ):
+    ensure_camera_access(user, camera_id)
     try:
         store.get(camera_id)
     except CameraNotFound:

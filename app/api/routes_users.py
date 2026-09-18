@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/users", tags=["users"], dependencies=[Depends(re
 def _public(u: User) -> UserPublic:
     return UserPublic(
         username=u.username, role=u.role, permissions=u.permissions,
+        allowed_camera_ids=u.allowed_camera_ids,
         created_at=u.created_at, totp_enabled=u.totp_enabled,
     )
 

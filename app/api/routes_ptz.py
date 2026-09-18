@@ -3,8 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.deps import get_ptz_registry, get_store, require_ptz_control
-from app.models import Camera
+from app.deps import ensure_camera_access, get_ptz_registry, get_store, require_auth, require_ptz_control
+from app.models import Camera, User
 from app.onvif_client import OnvifError
 from app.ptz_registry import PTZRegistry
 from app.store import CameraNotFound, CameraStore
@@ -22,7 +22,8 @@ class PresetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
-def _require_ptz_camera(camera_id: str, store: CameraStore) -> Camera:
+def _require_ptz_camera(camera_id: str, store: CameraStore, user: User) -> Camera:
+    ensure_camera_access(user, camera_id)
     try:
         camera = store.get(camera_id)
     except CameraNotFound:
@@ -42,8 +43,9 @@ async def move(
     payload: MoveRequest,
     store: CameraStore = Depends(get_store),
     registry: PTZRegistry = Depends(get_ptz_registry),
+    user: User = Depends(require_auth),
 ):
-    camera = _require_ptz_camera(camera_id, store)
+    camera = _require_ptz_camera(camera_id, store, user)
     client = await _client(camera, registry)
     try:
         await client.continuous_move(payload.pan, payload.tilt, payload.zoom)
@@ -57,8 +59,9 @@ async def stop(
     camera_id: str,
     store: CameraStore = Depends(get_store),
     registry: PTZRegistry = Depends(get_ptz_registry),
+    user: User = Depends(require_auth),
 ):
-    camera = _require_ptz_camera(camera_id, store)
+    camera = _require_ptz_camera(camera_id, store, user)
     client = await _client(camera, registry)
     try:
         await client.stop()
@@ -72,8 +75,9 @@ async def list_presets(
     camera_id: str,
     store: CameraStore = Depends(get_store),
     registry: PTZRegistry = Depends(get_ptz_registry),
+    user: User = Depends(require_auth),
 ):
-    camera = _require_ptz_camera(camera_id, store)
+    camera = _require_ptz_camera(camera_id, store, user)
     client = await _client(camera, registry)
     try:
         presets = await client.get_presets()
@@ -88,8 +92,9 @@ async def create_preset(
     payload: PresetCreate,
     store: CameraStore = Depends(get_store),
     registry: PTZRegistry = Depends(get_ptz_registry),
+    user: User = Depends(require_auth),
 ):
-    camera = _require_ptz_camera(camera_id, store)
+    camera = _require_ptz_camera(camera_id, store, user)
     client = await _client(camera, registry)
     try:
         token = await client.set_preset(payload.name)
@@ -104,8 +109,9 @@ async def goto_preset(
     preset_token: str,
     store: CameraStore = Depends(get_store),
     registry: PTZRegistry = Depends(get_ptz_registry),
+    user: User = Depends(require_auth),
 ):
-    camera = _require_ptz_camera(camera_id, store)
+    camera = _require_ptz_camera(camera_id, store, user)
     client = await _client(camera, registry)
     try:
         await client.goto_preset(preset_token)
@@ -120,8 +126,9 @@ async def delete_preset(
     preset_token: str,
     store: CameraStore = Depends(get_store),
     registry: PTZRegistry = Depends(get_ptz_registry),
+    user: User = Depends(require_auth),
 ):
-    camera = _require_ptz_camera(camera_id, store)
+    camera = _require_ptz_camera(camera_id, store, user)
     client = await _client(camera, registry)
     try:
         await client.remove_preset(preset_token)

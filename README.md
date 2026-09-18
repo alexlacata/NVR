@@ -621,6 +621,17 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
     voir ci-dessous —, gestion de l'annuaire *Mes systèmes*, et
     configuration des notifications webhook/e-mail).
 
+  En plus de ces permissions (ce qu'un lecteur a le droit de *faire*), vous
+  pouvez restreindre *quelles caméras* il voit : cochez `Limiter l'accès à
+  certaines caméras` sous son compte, puis sélectionnez-les une par une —
+  par exemple pour qu'une personne qui garde les enfants ne voie que la
+  caméra du salon, sans accès aux autres pièces. Sans cette case cochée
+  (comportement par défaut), un lecteur voit toutes les caméras. La
+  restriction s'applique à tout ce qui concerne cette caméra : direct,
+  enregistrements, vignettes, PTZ — un lecteur restreint reçoit une simple
+  réponse « caméra introuvable » pour toute caméra hors de sa liste, y
+  compris en appel direct à l'API, pas seulement dans l'interface.
+
   Un administrateur a toujours accès à tout, quoi que ces cases indiquent.
   La gestion des comptes elle-même (créer/supprimer un utilisateur, changer
   un rôle ou des permissions) reste réservée aux administrateurs — un

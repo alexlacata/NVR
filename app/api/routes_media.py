@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from app.audit_log import AuditLog
 from app.config import Settings
 from app.deps import (
+    ensure_camera_access,
     get_audit_log,
     get_settings,
     get_store,
@@ -34,7 +35,8 @@ _MIME_TYPES = {
 }
 
 
-def _require_camera(camera_id: str, store: CameraStore) -> None:
+def _require_camera(camera_id: str, store: CameraStore, user: User) -> None:
+    ensure_camera_access(user, camera_id)
     try:
         store.get(camera_id)
     except CameraNotFound:
@@ -47,8 +49,9 @@ def get_live_file(
     filename: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     if not _HLS_NAME_RE.match(filename):
         raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     path = settings.hls_dir / camera_id / filename
@@ -64,8 +67,9 @@ async def get_snapshot(
     camera_id: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     hls_dir = settings.hls_dir / camera_id
     segments = sorted(hls_dir.glob("seg_*.ts"))
     if not segments:
@@ -96,8 +100,9 @@ def list_recordings(
     date: str | None = None,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     rec_dir = settings.recordings_dir / camera_id
     if not rec_dir.exists():
         return []
@@ -129,12 +134,13 @@ def find_recording_at(
     ts: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
     """Given an ISO 8601 timestamp, find which recording segment covers it
     and the offset (seconds) to seek to within that file — used by the
     timeline and thumbnail strip to jump playback to an exact point in
     time, without the client needing to know the segment length."""
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     try:
         target = datetime.fromisoformat(ts)
     except ValueError:
@@ -163,8 +169,9 @@ def list_thumbnails(
     date: str | None = None,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     thumb_dir = settings.thumbnails_dir / camera_id
     if not thumb_dir.exists():
         return []
@@ -190,8 +197,9 @@ def get_thumbnail(
     filename: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     if not _THUMB_NAME_RE.match(filename):
         raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     thumb_dir = (settings.thumbnails_dir / camera_id).resolve()
@@ -225,7 +233,7 @@ def get_recording(
     user: User = Depends(require_auth),
     audit_log: AuditLog = Depends(get_audit_log),
 ):
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     path = _resolve_recording_path(settings, camera_id, filename)
     audit_log.record(user.username, "view", camera_id, filename, dedupe_seconds=60)
     return FileResponse(path, media_type="video/mp4", filename=filename)
@@ -249,7 +257,7 @@ def download_recording(
     recordings without letting them save a copy to their device - handy to
     keep download off for accounts that mostly connect over a metered 4G
     link."""
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     path = _resolve_recording_path(settings, camera_id, filename)
     audit_log.record(user.username, "download", camera_id, filename)
     return FileResponse(path, media_type="video/mp4", filename=filename)
@@ -264,13 +272,14 @@ def get_recording_checksum(
     filename: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
     """SHA256 of a recording, computed on demand from the file currently on
     disk - for chain-of-custody purposes (prove a downloaded copy matches
     what the NVR actually holds). Gated behind the same permission as
     download, since checksumming only matters once you have a copy to
     verify against."""
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     path = _resolve_recording_path(settings, camera_id, filename)
     return {
         "filename": filename,
@@ -285,8 +294,9 @@ def delete_recording(
     filename: str,
     store: CameraStore = Depends(get_store),
     settings: Settings = Depends(get_settings),
+    user: User = Depends(require_auth),
 ):
-    _require_camera(camera_id, store)
+    _require_camera(camera_id, store, user)
     path = _resolve_recording_path(settings, camera_id, filename)
     path.unlink()
     return None

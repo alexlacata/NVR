@@ -4,9 +4,18 @@ import shutil
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.deps import get_motion_registry, get_ptz_registry, get_settings, get_store, get_stream_manager, require_auth, require_cameras_manage
+from app.deps import (
+    ensure_camera_access,
+    get_motion_registry,
+    get_ptz_registry,
+    get_settings,
+    get_store,
+    get_stream_manager,
+    require_auth,
+    require_cameras_manage,
+)
 from app.ffmpeg_manager import StreamManager
-from app.models import Camera, CameraCreate, CameraUpdate, CameraWithStatus, Permission, User, has_permission
+from app.models import Camera, CameraCreate, CameraUpdate, CameraWithStatus, Permission, User, can_access_camera, has_permission
 from app.motion import MotionRegistry
 from app.ptz_registry import PTZRegistry
 from app.store import CameraNotFound, CameraStore, DuplicateCameraId
@@ -32,7 +41,7 @@ def list_cameras(
     manager: StreamManager = Depends(get_stream_manager),
     user: User = Depends(require_auth),
 ):
-    return [_with_status(c, manager, user) for c in store.list()]
+    return [_with_status(c, manager, user) for c in store.list() if can_access_camera(user, c.id)]
 
 
 @router.post("", response_model=CameraWithStatus, status_code=201, dependencies=[Depends(require_cameras_manage)])
@@ -57,6 +66,7 @@ def get_camera(
     manager: StreamManager = Depends(get_stream_manager),
     user: User = Depends(require_auth),
 ):
+    ensure_camera_access(user, camera_id)
     try:
         camera = store.get(camera_id)
     except CameraNotFound:
@@ -72,6 +82,7 @@ async def update_camera(
     manager: StreamManager = Depends(get_stream_manager),
     user: User = Depends(require_auth),
 ):
+    ensure_camera_access(user, camera_id)
     try:
         camera = store.update(camera_id, payload)
     except CameraNotFound:
@@ -89,7 +100,9 @@ async def delete_camera(
     settings=Depends(get_settings),
     ptz_registry: PTZRegistry = Depends(get_ptz_registry),
     motion_registry: MotionRegistry = Depends(get_motion_registry),
+    user: User = Depends(require_auth),
 ):
+    ensure_camera_access(user, camera_id)
     try:
         store.delete(camera_id)
     except CameraNotFound:

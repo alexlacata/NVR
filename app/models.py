@@ -279,6 +279,13 @@ class UserBase(BaseModel):
     # Only meaningful for role=viewer - an admin always has every permission
     # regardless of what's stored here (see effective_permissions()).
     permissions: list[Permission] = Field(default_factory=lambda: list(DEFAULT_VIEWER_PERMISSIONS))
+    # Which cameras this account can see at all, by id. None (the default)
+    # means every camera - the behavior before per-camera restrictions
+    # existed, and always the case for an admin regardless of what's stored
+    # here (see can_access_camera()). An empty list means "no cameras",
+    # a real (if unusual) state an admin might set deliberately. Stale ids
+    # (a camera later deleted) are harmless - they just never match.
+    allowed_camera_ids: Optional[list[str]] = None
 
     @field_validator("username")
     @classmethod
@@ -305,6 +312,16 @@ def has_permission(user: "UserBase", permission: Permission) -> bool:
     return permission in effective_permissions(user)
 
 
+def can_access_camera(user: "UserBase", camera_id: str) -> bool:
+    """Whether `user` can see/use `camera_id` at all. An admin always can;
+    a viewer can unless restricted to a specific list that excludes it."""
+    if user.role == UserRole.admin:
+        return True
+    if user.allowed_camera_ids is None:
+        return True
+    return camera_id in user.allowed_camera_ids
+
+
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=200)
 
@@ -313,6 +330,11 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     permissions: Optional[list[Permission]] = None
     password: Optional[str] = Field(default=None, min_length=8, max_length=200)
+    # None is a real value here (see UserBase.allowed_camera_ids), so
+    # UserStore.update() distinguishes "not provided" from "provided as
+    # null" via model_fields_set rather than the `is not None` check used
+    # for the fields above.
+    allowed_camera_ids: Optional[list[str]] = None
 
 
 class PasswordChange(BaseModel):

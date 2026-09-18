@@ -939,14 +939,26 @@ function mountStreamHelpers() {
   }
   systemInfo = await apiJson("/api/system").catch(() => null);
   await loadRouterCredentialsForLinks();
-  await loadCamera();
+  try {
+    await loadCamera();
+  } catch (e) {
+    // Nonexistent camera, or one this account is restricted away from -
+    // both surface as the same 404 (see ensure_camera_access server-side),
+    // so there's nothing more specific to tell the visitor here.
+    document.querySelector(".container").innerHTML = "";
+    document.querySelector(".container").appendChild(el("div", { class: "empty-state" }, [
+      el("p", {}, "Camera introuvable, ou vous n'y avez pas acces."),
+      el("a", { class: "btn", href: "/index.html" }, "Retour au tableau de bord"),
+    ]));
+    return;
+  }
   if (hasPermission("cameras_manage")) mountStreamHelpers();
   const today = localDateStr(new Date());
   document.getElementById("date-filter").value = today;
   await loadRecordings(today);
   await loadTimeline(today);
   await refreshMotionBadge();
-  setInterval(loadCamera, 15000);
+  setInterval(() => { loadCamera().catch(() => {}); }, 15000);
   setInterval(refreshMotionBadge, 8000);
 })();
 </script>
