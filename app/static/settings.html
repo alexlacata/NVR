@@ -138,11 +138,21 @@
     <div class="section-title">Reglages du serveur</div>
     <div class="card" style="padding:16px 18px">
       <form class="form-grid" id="server-form">
+        <div>
+          <label>Conservation des enregistrements</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px" id="retention-presets">
+            <button type="button" class="btn secondary" data-retention-days="7">7 jours</button>
+            <button type="button" class="btn secondary" data-retention-days="14">14 jours</button>
+            <button type="button" class="btn secondary" data-retention-days="30">30 jours</button>
+            <button type="button" class="btn secondary" data-retention-days="0">Ecrasement permanent (illimite)</button>
+          </div>
+          <input type="text" inputmode="numeric" id="s-retention-days" placeholder="ex. 14, ou un autre nombre de jours">
+          <div class="hint" id="retention-days-hint"></div>
+        </div>
         <div class="row">
-          <div><label>Conserver les enregistrements pendant (jours)</label><input type="text" inputmode="numeric" id="s-retention-days"></div>
           <div><label>Espace disque libre minimum a garder (%)</label><input type="text" inputmode="numeric" id="s-min-free-disk"></div>
         </div>
-        <div class="hint">Passe ce nombre de jours, ou sous ce seuil d'espace libre, les enregistrements les plus anciens sont supprimes automatiquement pour faire de la place.</div>
+        <div class="hint">Quel que soit le reglage ci-dessus, si l'espace disque libre descend sous ce seuil, les enregistrements les plus anciens sont supprimes automatiquement pour faire de la place aux nouveaux (c'est ce mecanisme qui permet l'"ecrasement permanent" : la camera enregistre en continu, sans jamais s'arreter, et les plus vieilles videos disparaissent au fur et a mesure).</div>
 
         <details class="settings-section" id="section-server-advanced">
           <summary>
@@ -711,7 +721,35 @@ async function loadServerSettings() {
   document.getElementById("s-thumb-interval").value = s.thumbnail_interval_seconds;
   document.getElementById("s-thumb-check-interval").value = s.thumbnail_check_interval_seconds;
   document.getElementById("s-retention-check-interval").value = s.retention_check_interval_seconds;
+  updateRetentionDisplay();
 }
+
+// Keeps the preset buttons' highlighted state and the explanatory hint in
+// sync with whatever is currently in the (freely editable) days field -
+// whether that got there from a preset click or manual typing.
+function updateRetentionDisplay() {
+  const raw = document.getElementById("s-retention-days").value.trim();
+  const days = /^\d+$/.test(raw) ? Number(raw) : null;
+  document.querySelectorAll("#retention-presets button").forEach((btn) => {
+    const isActive = days !== null && Number(btn.dataset.retentionDays) === days;
+    btn.className = isActive ? "btn" : "btn secondary";
+  });
+  const hintEl = document.getElementById("retention-days-hint");
+  if (days === 0) {
+    hintEl.textContent = "Ecrasement permanent : aucune limite de duree, les enregistrements s'accumulent indefiniment - c'est le seuil d'espace disque ci-dessous qui declenche la suppression des plus anciens, en boucle continue.";
+  } else if (days !== null) {
+    hintEl.textContent = `Les enregistrements de plus de ${days} jour${days > 1 ? "s" : ""} sont supprimes automatiquement.`;
+  } else {
+    hintEl.textContent = "";
+  }
+}
+document.getElementById("s-retention-days").addEventListener("input", updateRetentionDisplay);
+document.querySelectorAll("#retention-presets button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.getElementById("s-retention-days").value = btn.dataset.retentionDays;
+    updateRetentionDisplay();
+  });
+});
 
 document.getElementById("server-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();

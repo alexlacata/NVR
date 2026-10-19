@@ -650,6 +650,18 @@ Cliquez sur **Paramètres** dans la barre du haut pour accéder à :
   redémarrent brièvement pour prendre en compte les nouveaux réglages
   (segments, HLS, vignettes).
 
+  La conservation des enregistrements (*Paramètres → Réglages du
+  serveur*) propose des boutons de préréglage (7, 14, 30 jours) en plus
+  d'un nombre de jours personnalisé, et un mode **Écrasement permanent**
+  (`retention_days = 0`) : aucune limite de durée, les enregistrements les
+  plus anciens ne sont supprimés que lorsque l'espace disque libre passe
+  sous le seuil réglé juste en dessous (`min_free_disk_percent`) — un
+  enregistrement en boucle continue, comme un DVR classique qui réécrit
+  par-dessus les plus vieilles images. Ce seuil d'espace disque
+  s'applique quoi qu'il arrive, même avec une durée de conservation
+  fixée : c'est le filet de sécurité qui évite de saturer le disque si
+  plus de vidéo est produite que prévu.
+
 `NVR_ADMIN_USERNAME`/`NVR_ADMIN_PASSWORD` ne servent qu'à créer le tout
 premier compte administrateur au premier démarrage (quand aucun utilisateur
 n'existe encore) ; une fois ce compte créé, ces variables n'ont plus aucun
@@ -934,7 +946,7 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_RATE_LIMIT_MAX_REQUESTS` | `120` | Nombre max de requêtes API par identité (compte, sinon IP) dans la fenêtre ci-dessous, au-delà des routes de connexion |
 | `NVR_RATE_LIMIT_WINDOW_SECONDS` | `60` | Fenêtre de temps de la limitation de débit générale de l'API |
 | `NVR_SEGMENT_SECONDS` | `600` | Durée d'un fichier d'enregistrement (secondes) — modifiable aussi depuis **Paramètres** |
-| `NVR_RETENTION_DAYS` | `14` | Suppression des enregistrements plus vieux que N jours — idem |
+| `NVR_RETENTION_DAYS` | `14` | Suppression des enregistrements plus vieux que N jours — idem. `0` = pas de limite de duree (ecrasement permanent, voir ci-dessus) |
 | `NVR_MIN_FREE_DISK_PERCENT` | `10` | Purge des plus anciens enregistrements sous ce seuil d'espace libre — idem |
 | `NVR_HLS_SEGMENT_SECONDS` | `2` | Taille des segments HLS (latence du direct) — idem |
 | `NVR_HLS_LIST_SIZE` | `6` | Nombre de segments HLS conservés dans la playlist (marge sur liaison instable) — idem |

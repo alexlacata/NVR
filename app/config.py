@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # Recording / retention
     segment_seconds: int = 600  # length of each recorded file (10 min)
-    retention_days: int = 14  # delete recordings older than this
+    retention_days: int = 14  # delete recordings older than this; 0 = no age limit (overwrite-when-full only)
     min_free_disk_percent: float = 10.0  # start deleting oldest files below this
     retention_check_interval_seconds: int = 60
 

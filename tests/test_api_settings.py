@@ -68,7 +68,20 @@ async def test_patch_settings_partial_update_leaves_others_untouched(client, app
 @pytest.mark.asyncio
 async def test_patch_settings_rejects_out_of_range(client):
     await _login_admin(client)
-    resp = await client.patch("/api/settings", json={"retention_days": 0})
+    resp = await client.patch("/api/settings", json={"retention_days": -1})
+    assert resp.status_code == 422
+    resp = await client.patch("/api/settings", json={"retention_days": 3651})
     assert resp.status_code == 422
     resp = await client.patch("/api/settings", json={"min_free_disk_percent": 200})
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_settings_accepts_zero_retention_days_as_unlimited(client, app_settings):
+    # 0 = "ecrasement permanent": no age-based cutoff, only the disk-space
+    # eviction in app/retention.py still applies.
+    await _login_admin(client)
+    resp = await client.patch("/api/settings", json={"retention_days": 0})
+    assert resp.status_code == 200
+    assert resp.json()["retention_days"] == 0
+    assert app_settings.retention_days == 0

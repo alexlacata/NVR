@@ -64,3 +64,36 @@ def test_deletes_oldest_first_when_disk_low(tmp_path):
     assert not newer.exists()
     assert report.deleted_files == 2
     assert report.reason == "disk_space"
+
+
+def test_retention_days_zero_never_deletes_by_age(tmp_path):
+    # "ecrasement permanent" mode: no age-based cutoff at all, however old
+    # a file is - only the disk-space pass (exercised by the test above)
+    # can delete anything.
+    settings = Settings(data_dir=tmp_path, retention_days=0, min_free_disk_percent=0)
+    settings.ensure_dirs()
+    ancient_file = settings.recordings_dir / "cam1" / "2000-01-01_00-00-00.mp4"
+    _make_file(ancient_file, age_seconds=20 * 365 * 86400)
+
+    report = enforce_retention(settings)
+
+    assert ancient_file.exists()
+    assert report.deleted_files == 0
+
+
+def test_retention_days_zero_still_honors_disk_space_eviction(tmp_path):
+    settings = Settings(data_dir=tmp_path, retention_days=0, min_free_disk_percent=99.999)
+    settings.ensure_dirs()
+    f = settings.recordings_dir / "cam1" / "2000-01-01_00-00-00.mp4"
+    _make_file(f, age_seconds=20 * 365 * 86400)
+
+    class FakeUsage:
+        total = 100
+        free = 1
+
+    with mock.patch("app.retention.shutil.disk_usage", return_value=FakeUsage()):
+        report = enforce_retention(settings)
+
+    assert not f.exists()
+    assert report.deleted_files == 1
+    assert report.reason == "disk_space"

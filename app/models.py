@@ -363,7 +363,12 @@ class UserPublic(UserBase):
 
 
 class RuntimeSettingsUpdate(BaseModel):
-    retention_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    # 0 = no age-based limit ("ecrasement permanent" in the UI): recordings
+    # are never deleted just for being old, only once free disk space runs
+    # low (see min_free_disk_percent / app.retention.enforce_retention) -
+    # the classic continuous-loop DVR behavior. 1-3650 = delete anything
+    # older than that many days, same as before this mode existed.
+    retention_days: Optional[int] = Field(default=None, ge=0, le=3650)
     min_free_disk_percent: Optional[float] = Field(default=None, ge=0, le=90)
     segment_seconds: Optional[int] = Field(default=None, ge=10, le=3600)
     hls_segment_seconds: Optional[int] = Field(default=None, ge=1, le=30)

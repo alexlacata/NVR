@@ -1,7 +1,8 @@
 """Keeps recordings (and their thumbnails) from filling up the disk:
-deletes files older than `retention_days`, and if free space still falls
-below `min_free_disk_percent`, deletes the oldest remaining files (across
-all cameras) until it doesn't.
+deletes files older than `retention_days` (unless it's 0, meaning no age
+limit - "ecrasement permanent" mode), and if free space still falls below
+`min_free_disk_percent`, deletes the oldest remaining files (across all
+cameras) until it doesn't.
 """
 from __future__ import annotations
 
@@ -46,19 +47,23 @@ def _managed_files(settings: Settings):
 def enforce_retention(settings: Settings) -> RetentionReport:
     report = RetentionReport()
     now = time.time()
-    max_age = settings.retention_days * 86400
 
-    for f in list(_managed_files(settings)):
-        try:
-            age = now - f.stat().st_mtime
-        except OSError:
-            continue
-        if age > max_age:
-            size = _safe_size(f)
-            if _safe_unlink(f):
-                report.deleted_files += 1
-                report.freed_bytes += size
-                report.reason = "age"
+    # retention_days == 0 is the "ecrasement permanent" mode: no age-based
+    # cutoff at all, recordings only ever get deleted by the disk-space
+    # pass below once free space runs low - a continuous-loop DVR.
+    if settings.retention_days > 0:
+        max_age = settings.retention_days * 86400
+        for f in list(_managed_files(settings)):
+            try:
+                age = now - f.stat().st_mtime
+            except OSError:
+                continue
+            if age > max_age:
+                size = _safe_size(f)
+                if _safe_unlink(f):
+                    report.deleted_files += 1
+                    report.freed_bytes += size
+                    report.reason = "age"
 
     usage = shutil.disk_usage(settings.data_dir)
     free_percent = 100.0 * usage.free / usage.total if usage.total else 100.0
