@@ -17,6 +17,12 @@ un navigateur web.
 - **Enregistrement continu sur disque** : chaque caméra enregistre en
   fichiers de 10 minutes (configurable), avec purge automatique par ancienneté
   et par espace disque libre pour ne jamais saturer le disque.
+- **Surveillance de la machine** : en plus de l'espace disque, le tableau de
+  bord affiche l'utilisation CPU, la RAM et la température du processeur
+  (utile sur Raspberry Pi, qui peut chauffer et ralentir sans avertissement) —
+  chaque indicateur passe en orange puis en rouge au-delà d'un seuil, et
+  disparaît simplement s'il n'est pas lisible sur la machine (ex. dans un
+  conteneur sans accès au capteur de température).
 - **Passerelle vidéo → téléphone / ordinateur** : lecture en direct (HLS,
   quelques secondes de latence, compatible navigateur mobile/desktop sans
   application) et relecture des enregistrements, avec téléchargement.

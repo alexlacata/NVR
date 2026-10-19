@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 
 from app.config import Settings
 from app.deps import get_settings, require_auth
+from app.system_health import read_system_health
 
 router = APIRouter(prefix="/api/system", tags=["system"], dependencies=[Depends(require_auth)])
 
@@ -23,4 +24,5 @@ def system_info(settings: Settings = Depends(get_settings)):
         "data_dir": str(settings.data_dir),
         "segment_seconds": settings.segment_seconds,
         "thumbnail_interval_seconds": settings.thumbnail_interval_seconds,
+        **read_system_health(),
     }

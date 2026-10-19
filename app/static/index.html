@@ -54,6 +54,23 @@ function renderDiskCard(info) {
     el("span", {}, `${fmtBytes(info.disk_used_bytes)} utilises sur ${fmtBytes(info.disk_total_bytes)}`),
     el("span", {}, `${info.disk_free_percent}% libre - retention ${info.retention_days} j`),
   ]));
+
+  // CPU/RAM/temperature - each omitted entirely when unavailable on this
+  // host (e.g. no thermal zone inside a container without hardware
+  // access) rather than showing a misleading placeholder.
+  const sysStatChip = (label, value, unit, warnAt, errAt) => {
+    if (value === null || value === undefined) return null;
+    const level = errAt !== null && value >= errAt ? "err" : warnAt !== null && value >= warnAt ? "warn" : "";
+    return el("span", { class: `sys-stat ${level}` }, `${label} ${value}${unit}`);
+  };
+  const statsRow = [
+    sysStatChip("CPU", info.cpu_load_percent, "%", 80, 100),
+    sysStatChip("RAM", info.memory_percent, "%", 85, 95),
+    sysStatChip("Temperature", info.cpu_temperature_celsius, "°C", 70, 80),
+  ].filter(Boolean);
+  if (statsRow.length) {
+    card.appendChild(el("div", { class: "sys-stats" }, statsRow));
+  }
 }
 
 // Dashboard cards show a still snapshot, not a live stream: playing every
