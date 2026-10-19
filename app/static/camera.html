@@ -48,6 +48,15 @@
     <div id="thumb-strip" class="thumb-strip"></div>
   </div>
 
+  <div id="motion-events-section" hidden>
+    <div class="section-title">Mouvements detectes</div>
+    <p class="hint" style="margin-top:0">Chaque ligne ouvre un court passage (environ 30 secondes) autour
+      du moment detecte, pour verifier rapidement de quoi il s'agissait. Pour revoir une periode plus
+      longue ou differente, utilisez la ligne du temps ci-dessus comme d'habitude : ceci ne fait que vous
+      y amener plus vite.</p>
+    <div id="motion-events-list" class="rec-list"></div>
+  </div>
+
   <div id="recordings"></div>
 
   <div id="admin-settings-section">
@@ -318,6 +327,7 @@ async function loadCamera() {
   document.getElementById("f-motion-sensitivity").value = cam.motion_sensitivity;
   document.getElementById("motion-sensitivity-val").textContent = cam.motion_sensitivity;
   updateMotionFieldsVisibility();
+  document.getElementById("motion-events-section").hidden = !cam.motion_enabled;
   if (hasPermission("cameras_manage")) {
     buildMotionMaskEditor(cam);
     buildScheduleEditor(cam);
@@ -512,9 +522,49 @@ async function refreshMotionBadge() {
         ? `Dernier mouvement detecte : ${new Date(status.last_motion_at).toLocaleString()}`
         : "Aucun mouvement detecte pour l'instant.";
     }
+    renderMotionEvents(status.recent_events || []);
   } catch (e) {
     badge.hidden = true;
   }
+}
+
+// Half-width (seconds) of the clip window opened around a motion event -
+// e.g. 15 means "15s before, 15s after" = a 30s window, matching how a
+// quick-review clip is usually framed. Jumps playback there via the same
+// seekToTime()/recordings-at-timestamp mechanism as a timeline or
+// thumbnail click; the full continuous timeline above is untouched, so
+// scrubbing to any other moment still works exactly as before - this is
+// purely a fast way *into* a moment already known to be interesting.
+const MOTION_CLIP_HALF_WINDOW_SECONDS = 15;
+
+function renderMotionEvents(events) {
+  const list = document.getElementById("motion-events-list");
+  list.innerHTML = "";
+  if (events.length === 0) {
+    list.appendChild(el("div", { class: "hint" }, "Aucun mouvement detecte pour l'instant."));
+    return;
+  }
+  events.forEach((evt) => {
+    const when = new Date(evt.at);
+    list.appendChild(el("div", { class: "rec-item" }, [
+      el("span", {}, when.toLocaleString()),
+      el("div", { class: "rec-actions" }, [
+        el("button", { class: "icon-btn", onclick: () => jumpToMotionEvent(when) }, "▶ Voir"),
+      ]),
+    ]));
+  });
+}
+
+async function jumpToMotionEvent(when) {
+  const target = new Date(when.getTime() - MOTION_CLIP_HALF_WINDOW_SECONDS * 1000);
+  const date = localDateStr(target);
+  const time = `${pad2(target.getHours())}:${pad2(target.getMinutes())}:${pad2(target.getSeconds())}`;
+  const dateFilter = document.getElementById("date-filter");
+  if (dateFilter.value !== date) {
+    dateFilter.value = date;
+    await Promise.all([loadRecordings(date), loadTimeline(date)]);
+  }
+  await seekToTime(date, time);
 }
 
 // --- PTZ ---

@@ -513,6 +513,17 @@ s'affiche sous le réglage de sensibilité. La fréquence de vérification
 (`NVR_MOTION_CHECK_INTERVAL_SECONDS`, 5 secondes par défaut) est un réglage
 serveur global.
 
+**Mouvements détectés** : dès que la détection est activée, une liste des
+derniers mouvements apparaît sur la page de la caméra (entre la ligne du
+temps et les enregistrements), accessible à tout compte pouvant voir la
+caméra (pas seulement les administrateurs). Chaque ligne ouvre, en un
+clic sur **▶ Voir**, un court passage d'environ 30 secondes autour du
+moment détecté - un raccourci pratique pour vérifier rapidement de quoi
+il s'agissait sans faire défiler toute la journée. La ligne du temps
+complète au-dessus reste utilisable normalement pour revoir n'importe
+quelle autre période à votre rythme ; ce raccourci n'y change rien,
+il ne fait qu'y amener plus vite.
+
 ## Notifications (webhook et e-mail)
 
 Depuis **Paramètres → Notifications** (réservé aux comptes avec la
