@@ -435,6 +435,14 @@ déplacer la caméra, relâchez pour arrêter. Le bouton **+ Préselection**
 enregistre la position actuelle de la caméra sous un nom, pour y revenir
 d'un tap.
 
+Deux curseurs dans cette même section règlent la vitesse des mouvements
+(1-100%, 50% par défaut) : **vitesse de déplacement** (haut/bas/gauche/
+droite) et **vitesse de zoom**, séparées car le moteur de zoom d'une
+caméra est souvent bien plus lent ou rapide que son moteur de rotation.
+Une vitesse plus basse donne un pilotage plus précis (petits mouvements
+fins) ; plus haute, elle parcourt une grande scène plus vite. Le réglage
+s'applique dès l'enregistrement, sans recharger la page.
+
 ## Relire un enregistrement : ligne du temps et vignettes
 
 Sur la page de la caméra, sous la vidéo, une ligne du temps représente les

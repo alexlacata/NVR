@@ -172,6 +172,15 @@
               <div><label>Identifiant de pilotage</label><input type="text" id="f-onvif-user"></div>
               <div><label>Mot de passe de pilotage</label><input type="password" id="f-onvif-pass" autocomplete="new-password"></div>
             </div>
+            <div>
+              <label>Vitesse de deplacement, haut/bas/gauche/droite (<span id="ptz-pan-tilt-speed-val">50</span>)</label>
+              <input type="range" id="f-ptz-pan-tilt-speed" min="1" max="100" value="50" style="width:100%">
+            </div>
+            <div>
+              <label>Vitesse de zoom (<span id="ptz-zoom-speed-val">50</span>)</label>
+              <input type="range" id="f-ptz-zoom-speed" min="1" max="100" value="50" style="width:100%">
+            </div>
+            <div class="hint">Reglez plus bas pour un pilotage plus precis (petits mouvements), plus haut pour parcourir une grande scene plus vite. Le zoom a souvent besoin d'une vitesse differente du deplacement selon le moteur de la camera.</div>
           </div>
         </div>
       </details>
@@ -316,6 +325,10 @@ async function loadCamera() {
   document.getElementById("f-onvif-url").value = cam.onvif_url || "";
   document.getElementById("f-onvif-user").value = cam.onvif_username || "";
   document.getElementById("f-onvif-pass").value = cam.onvif_password || "";
+  document.getElementById("f-ptz-pan-tilt-speed").value = cam.ptz_pan_tilt_speed;
+  document.getElementById("ptz-pan-tilt-speed-val").textContent = cam.ptz_pan_tilt_speed;
+  document.getElementById("f-ptz-zoom-speed").value = cam.ptz_zoom_speed;
+  document.getElementById("ptz-zoom-speed-val").textContent = cam.ptz_zoom_speed;
   updatePtzFieldsVisibility();
   document.getElementById("f-web-user").value = cam.web_username || "";
   document.getElementById("f-web-pass").value = cam.web_password || "";
@@ -378,6 +391,12 @@ function updatePtzFieldsVisibility() {
   document.getElementById("ptz-fields").hidden = !document.getElementById("f-ptz-enabled").checked;
 }
 document.getElementById("f-ptz-enabled").addEventListener("change", updatePtzFieldsVisibility);
+document.getElementById("f-ptz-pan-tilt-speed").addEventListener("input", (ev) => {
+  document.getElementById("ptz-pan-tilt-speed-val").textContent = ev.target.value;
+});
+document.getElementById("f-ptz-zoom-speed").addEventListener("input", (ev) => {
+  document.getElementById("ptz-zoom-speed-val").textContent = ev.target.value;
+});
 
 function updateMotionFieldsVisibility() {
   document.getElementById("motion-fields").hidden = !document.getElementById("f-motion-enabled").checked;
@@ -651,19 +670,26 @@ function renderPtzPanel(cam) {
     panel.innerHTML = "";
     return;
   }
-  if (panel.dataset.rendered === cam.id) return; // avoid rebuilding on every 15s poll
+  // Cache key includes the speed settings (not just cam.id) so saving a
+  // new pan/tilt or zoom speed rebuilds the pad with the new values
+  // immediately, instead of waiting for a page reload - this still skips
+  // rebuilding on every unrelated 15s poll.
+  const renderKey = `${cam.id}:${cam.ptz_pan_tilt_speed}:${cam.ptz_zoom_speed}`;
+  if (panel.dataset.rendered === renderKey) return;
   panel.hidden = false;
   panel.innerHTML = "";
-  panel.dataset.rendered = cam.id;
+  panel.dataset.rendered = renderKey;
 
+  const panTiltSpeed = cam.ptz_pan_tilt_speed / 100;
+  const zoomSpeed = cam.ptz_zoom_speed / 100;
   const pad = el("div", { class: "ptz-pad" }, [
-    ptzButton("↖", -0.5, 0.5, 0), ptzButton("↑", 0, 0.5, 0), ptzButton("↗", 0.5, 0.5, 0),
-    ptzButton("←", -0.5, 0, 0), ptzButton("⏹", 0, 0, 0), ptzButton("→", 0.5, 0, 0),
-    ptzButton("↙", -0.5, -0.5, 0), ptzButton("↓", 0, -0.5, 0), ptzButton("↘", 0.5, -0.5, 0),
+    ptzButton("↖", -panTiltSpeed, panTiltSpeed, 0), ptzButton("↑", 0, panTiltSpeed, 0), ptzButton("↗", panTiltSpeed, panTiltSpeed, 0),
+    ptzButton("←", -panTiltSpeed, 0, 0), ptzButton("⏹", 0, 0, 0), ptzButton("→", panTiltSpeed, 0, 0),
+    ptzButton("↙", -panTiltSpeed, -panTiltSpeed, 0), ptzButton("↓", 0, -panTiltSpeed, 0), ptzButton("↘", panTiltSpeed, -panTiltSpeed, 0),
   ]);
   const zoom = el("div", { class: "ptz-zoom" }, [
-    ptzButton("Zoom −", 0, 0, -0.5),
-    ptzButton("Zoom +", 0, 0, 0.5),
+    ptzButton("Zoom −", 0, 0, -zoomSpeed),
+    ptzButton("Zoom +", 0, 0, zoomSpeed),
   ]);
   const presetsRow = el("div", { class: "ptz-presets" });
   loadPtzPresets(presetsRow);
@@ -952,6 +978,8 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         onvif_url: document.getElementById("f-onvif-url").value || null,
         onvif_username: document.getElementById("f-onvif-user").value || null,
         onvif_password: document.getElementById("f-onvif-pass").value || null,
+        ptz_pan_tilt_speed: parseInt(document.getElementById("f-ptz-pan-tilt-speed").value, 10),
+        ptz_zoom_speed: parseInt(document.getElementById("f-ptz-zoom-speed").value, 10),
         web_username: document.getElementById("f-web-user").value || null,
         web_password: document.getElementById("f-web-pass").value || null,
         web_use_https: document.getElementById("f-web-https").checked,

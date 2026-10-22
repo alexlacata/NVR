@@ -83,6 +83,13 @@ class CameraBase(BaseModel):
     onvif_url: Optional[str] = Field(default=None, max_length=2000)
     onvif_username: Optional[str] = Field(default=None, max_length=200)
     onvif_password: Optional[str] = Field(default=None, max_length=200)
+    # Speed (1-100%) of a continuous-move command, sent straight through as
+    # the ONVIF ContinuousMove velocity (see OnvifPTZClient.continuous_move):
+    # 100 = full speed (velocity 1.0), 50 = half speed, etc. Separate dials
+    # for pan/tilt vs zoom since a camera's zoom motor is often much
+    # slower/faster than its pan/tilt motor - one speed rarely suits both.
+    ptz_pan_tilt_speed: int = Field(default=50, ge=1, le=100)
+    ptz_zoom_speed: int = Field(default=50, ge=1, le=100)
 
     # Login for the camera's own web admin page (its native interface, not
     # this NVR) - used only to build the one-click "already logged in"
@@ -200,6 +207,8 @@ class CameraUpdate(BaseModel):
     onvif_url: Optional[str] = Field(default=None, max_length=2000)
     onvif_username: Optional[str] = Field(default=None, max_length=200)
     onvif_password: Optional[str] = Field(default=None, max_length=200)
+    ptz_pan_tilt_speed: Optional[int] = Field(default=None, ge=1, le=100)
+    ptz_zoom_speed: Optional[int] = Field(default=None, ge=1, le=100)
     web_username: Optional[str] = Field(default=None, max_length=200)
     web_password: Optional[str] = Field(default=None, max_length=200)
     web_use_https: Optional[bool] = None

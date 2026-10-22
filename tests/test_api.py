@@ -47,6 +47,29 @@ async def test_login_then_crud_camera(client):
 
 
 @pytest.mark.asyncio
+async def test_patch_camera_ptz_speed(client):
+    await client.post("/api/auth/login", json={"username": "admin", "password": "s3cret-pass"})
+    resp = await client.post(
+        "/api/cameras",
+        json={"name": "Demo test", "source_type": "test", "url": "test:pattern"},
+    )
+    camera = resp.json()
+    assert camera["ptz_pan_tilt_speed"] == 50
+    assert camera["ptz_zoom_speed"] == 50
+
+    resp = await client.patch(
+        f"/api/cameras/{camera['id']}",
+        json={"ptz_pan_tilt_speed": 20, "ptz_zoom_speed": 90},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["ptz_pan_tilt_speed"] == 20
+    assert resp.json()["ptz_zoom_speed"] == 90
+
+    resp = await client.patch(f"/api/cameras/{camera['id']}", json={"ptz_pan_tilt_speed": 0})
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_bearer_token_also_works(client):
     resp = await client.post("/api/auth/login", json={"username": "admin", "password": "s3cret-pass"})
     token = resp.json()["token"]

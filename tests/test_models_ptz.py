@@ -20,6 +20,25 @@ def test_ptz_enabled_with_onvif_url_ok():
     assert cam.ptz_enabled is True
 
 
+def test_ptz_speed_defaults_to_50_percent():
+    cam = Camera(**_base())
+    assert cam.ptz_pan_tilt_speed == 50
+    assert cam.ptz_zoom_speed == 50
+
+
+def test_ptz_speed_accepts_custom_values():
+    cam = Camera(**_base(ptz_pan_tilt_speed=20, ptz_zoom_speed=90))
+    assert cam.ptz_pan_tilt_speed == 20
+    assert cam.ptz_zoom_speed == 90
+
+
+def test_ptz_speed_rejects_out_of_range():
+    with pytest.raises(ValidationError):
+        Camera(**_base(ptz_pan_tilt_speed=0))  # below minimum (1)
+    with pytest.raises(ValidationError):
+        Camera(**_base(ptz_zoom_speed=101))  # above maximum (100)
+
+
 def test_onvif_url_must_be_http():
     with pytest.raises(ValidationError):
         Camera(**_base(ptz_enabled=True, onvif_url="ftp://x"))
