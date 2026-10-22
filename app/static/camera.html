@@ -590,13 +590,25 @@ async function ptzStop() {
   } catch (e) {}
 }
 
+// Captures the pointer on press (same mechanism as the timeline bar's
+// drag-to-scrub above) so a finger/mouse drifting slightly off this small
+// 52px button while held doesn't fire pointerleave and cut the movement
+// short - only an explicit release (pointerup/pointercancel) stops it now,
+// matching how a physical PTZ joystick behaves.
 function ptzButton(label, pan, tilt, zoom) {
   const btn = el("button", { type: "button", class: "btn secondary ptz-btn" }, label);
-  const start = (ev) => { ev.preventDefault(); ptzMove(pan, tilt, zoom); };
+  const start = (ev) => {
+    ev.preventDefault();
+    try { btn.setPointerCapture(ev.pointerId); } catch (e) {}
+    ptzMove(pan, tilt, zoom);
+  };
+  const stop = (ev) => {
+    try { btn.releasePointerCapture(ev.pointerId); } catch (e) {}
+    ptzStop();
+  };
   btn.addEventListener("pointerdown", start);
-  btn.addEventListener("pointerup", ptzStop);
-  btn.addEventListener("pointerleave", ptzStop);
-  btn.addEventListener("pointercancel", ptzStop);
+  btn.addEventListener("pointerup", stop);
+  btn.addEventListener("pointercancel", stop);
   return btn;
 }
 
