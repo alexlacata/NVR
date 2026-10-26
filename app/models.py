@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -120,10 +120,22 @@ class CameraBase(BaseModel):
     # frame sampled from the camera's own live HLS segments already on
     # disk (no extra connection to the camera). motion_sensitivity is 0
     # (only large/close motion trips it) to 100 (trips on the slightest
-    # change). motion_mask_grid is either empty (no zone excluded) or
-    # exactly MOTION_GRID_CELLS booleans, true = excluded from detection.
+    # change). motion_mask_grid is either empty (no zone selected) or
+    # exactly MOTION_GRID_CELLS booleans; what a selected (true) cell means
+    # depends on motion_mask_mode:
+    # - "exclude" (default, prior behavior): selected cells are ignored,
+    #   everything else is monitored - a "zone a ignorer" (mask a specific
+    #   spot like a road or a tree moving in the wind out of an otherwise
+    #   fully-monitored scene).
+    # - "include": only selected cells are monitored, everything else is
+    #   ignored - a "zone a surveiller" (watch only a specific area, e.g. a
+    #   doorway, instead of the whole frame). An include-mode camera with
+    #   no cell selected monitors nothing at all - a real, if unusual,
+    #   configuration (not a bug) rather than silently falling back to
+    #   "monitor everything".
     motion_enabled: bool = False
     motion_sensitivity: int = Field(default=50, ge=0, le=100)
+    motion_mask_mode: Literal["exclude", "include"] = "exclude"
     motion_mask_grid: list[bool] = Field(default_factory=list)
 
     @field_validator("motion_mask_grid")
@@ -217,6 +229,7 @@ class CameraUpdate(BaseModel):
     thumbnail_interval_seconds: Optional[int] = Field(default=None, ge=5, le=3600)
     motion_enabled: Optional[bool] = None
     motion_sensitivity: Optional[int] = Field(default=None, ge=0, le=100)
+    motion_mask_mode: Optional[Literal["exclude", "include"]] = None
     motion_mask_grid: Optional[list[bool]] = None
     record_schedule: Optional[list[bool]] = None
 

@@ -510,10 +510,17 @@ comptes avec la permission *Gérer les caméras*) :
   déclenche trop souvent (vent dans les feuillages, variations de
   luminosité) ; montez-la pour détecter des mouvements plus discrets ou
   plus lointains.
-- **Zones de masquage** : cliquez sur les cases de la grille superposée à
-  l'aperçu de la caméra pour exclure une zone de la détection (une route
-  passante, un arbre, une fenêtre de voisinage...) sans désactiver la
-  détection pour le reste du champ de vision.
+- **Type de zone** : deux façons d'utiliser la même grille superposée à
+  l'aperçu de la caméra, selon ce qui est le plus simple à décrire pour
+  votre scène :
+  - **Zone à ignorer (masquage, par défaut)** : cliquez sur les cases à
+    exclure (une route passante, un arbre, une fenêtre de voisinage...) ;
+    tout le reste du champ de vision reste surveillé normalement.
+  - **Zone à surveiller (détection uniquement)** : à l'inverse, cliquez sur
+    la ou les seules cases à surveiller (une porte, un portail...) ; tout
+    le reste de l'image est ignoré. Si aucune case n'est cochée dans ce
+    mode, rien n'est surveillé — c'est un réglage valide (« ne rien
+    surveiller »), pas une erreur.
 
 Un badge **Mouvement** apparaît en haut de la page de la caméra dès qu'un
 mouvement est en cours de détection, et l'heure du dernier mouvement détecté

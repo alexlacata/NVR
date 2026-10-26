@@ -79,6 +79,27 @@ async def test_motion_mask_grid_full_length_accepted(client):
 
 
 @pytest.mark.asyncio
+async def test_motion_mask_mode_defaults_to_exclude(client):
+    await _login_admin(client)
+    resp = await client.post("/api/cameras", json={"id": "cam1", "name": "Cam 1", "source_type": "test", "url": "test:pattern"})
+    assert resp.json()["motion_mask_mode"] == "exclude"
+
+
+@pytest.mark.asyncio
+async def test_motion_mask_mode_accepts_include_and_rejects_invalid(client):
+    await _login_admin(client)
+    resp = await client.post("/api/cameras", json={
+        "id": "cam1", "name": "Cam 1", "source_type": "test", "url": "test:pattern",
+        "motion_mask_mode": "include",
+    })
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["motion_mask_mode"] == "include"
+
+    resp = await client.patch("/api/cameras/cam1", json={"motion_mask_mode": "bogus"})
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_update_camera_motion_settings_requires_cameras_manage(client):
     await _login_admin(client)
     await client.post("/api/cameras", json={"id": "cam1", "name": "Cam 1", "source_type": "test", "url": "test:pattern"})

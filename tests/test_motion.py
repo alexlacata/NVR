@@ -41,6 +41,25 @@ def test_mask_grid_to_pixels_masks_the_right_pixels():
     assert pixels[DETECT_W - 1] == 0  # top-right pixel is not (grid is 8 wide)
 
 
+def test_mask_grid_to_pixels_include_mode_inverts_selection():
+    # "include" mode: a selected cell is the only part monitored - the
+    # opposite of the default "exclude" mode's meaning for the same grid.
+    grid = [False] * MOTION_GRID_CELLS
+    grid[0] = True  # top-left grid cell is the only zone to watch
+    pixels = mask_grid_to_pixels(grid, "include")
+    assert pixels is not None
+    assert pixels[0] == 0  # top-left pixel: inside the watched cell, not excluded
+    assert pixels[DETECT_W - 1] == 1  # top-right pixel: outside it, excluded
+
+
+def test_mask_grid_to_pixels_include_mode_with_nothing_selected_excludes_everything():
+    # Unlike "exclude" mode, an empty/all-false grid in "include" mode is
+    # not a no-op - it's a real (if unusual) "watch nothing" configuration.
+    pixels = mask_grid_to_pixels([False] * MOTION_GRID_CELLS, "include")
+    assert pixels is not None
+    assert all(p == 1 for p in pixels)
+
+
 def test_compute_changed_ratio_identical_frames_is_zero():
     frame = bytes([100]) * (DETECT_W * DETECT_H)
     assert compute_changed_ratio(frame, frame, None) == 0.0
@@ -133,12 +152,16 @@ class FakeMotionSettings:
 
 
 class FakeMotionCamera:
-    def __init__(self, id="cam1", name="Cam 1", motion_enabled=True, motion_sensitivity=90, motion_mask_grid=None):
+    def __init__(
+        self, id="cam1", name="Cam 1", motion_enabled=True, motion_sensitivity=90,
+        motion_mask_grid=None, motion_mask_mode="exclude",
+    ):
         self.id = id
         self.name = name
         self.motion_enabled = motion_enabled
         self.motion_sensitivity = motion_sensitivity
         self.motion_mask_grid = motion_mask_grid or []
+        self.motion_mask_mode = motion_mask_mode
 
 
 class FakeNotifier:

@@ -238,8 +238,13 @@
             </div>
             <div class="hint">Plus la sensibilite est elevee, plus un petit changement suffit a declencher une detection.</div>
             <div class="hint" id="motion-status-hint"></div>
-            <label>Zones a ignorer (exclues de la detection)</label>
-            <div class="hint">Cliquez sur les cases a exclure (ex. une route, des arbres qui bougent au vent) pour eviter les fausses alertes a cet endroit.</div>
+            <label>Type de zone</label>
+            <div class="row">
+              <label class="checkbox-row"><input type="radio" name="f-mask-mode" id="f-mask-mode-exclude" value="exclude"> Zone a ignorer (masquage)</label>
+              <label class="checkbox-row"><input type="radio" name="f-mask-mode" id="f-mask-mode-include" value="include"> Zone a surveiller (detection uniquement)</label>
+            </div>
+            <label id="motion-mask-label">Zones a ignorer (exclues de la detection)</label>
+            <div class="hint" id="motion-mask-hint">Cliquez sur les cases a exclure (ex. une route, des arbres qui bougent au vent) pour eviter les fausses alertes a cet endroit.</div>
             <div id="motion-mask-editor" class="motion-mask-editor"></div>
           </div>
         </div>
@@ -339,6 +344,9 @@ async function loadCamera() {
   document.getElementById("f-motion-enabled").checked = cam.motion_enabled;
   document.getElementById("f-motion-sensitivity").value = cam.motion_sensitivity;
   document.getElementById("motion-sensitivity-val").textContent = cam.motion_sensitivity;
+  const maskMode = cam.motion_mask_mode === "include" ? "include" : "exclude";
+  document.getElementById(`f-mask-mode-${maskMode}`).checked = true;
+  updateMotionMaskLabel(maskMode);
   updateMotionFieldsVisibility();
   document.getElementById("motion-events-section").hidden = !cam.motion_enabled;
   if (hasPermission("cameras_manage")) {
@@ -404,6 +412,23 @@ function updateMotionFieldsVisibility() {
 document.getElementById("f-motion-enabled").addEventListener("change", updateMotionFieldsVisibility);
 document.getElementById("f-motion-sensitivity").addEventListener("input", (ev) => {
   document.getElementById("motion-sensitivity-val").textContent = ev.target.value;
+});
+
+// Same grid either way - only the label/hint and what a checked cell
+// means change with the mode (see app/motion.py mask_grid_to_pixels).
+function updateMotionMaskLabel(mode) {
+  const label = document.getElementById("motion-mask-label");
+  const hint = document.getElementById("motion-mask-hint");
+  if (mode === "include") {
+    label.textContent = "Zone a surveiller (seule zone detectee)";
+    hint.textContent = "Cliquez sur la ou les cases a surveiller (ex. une porte, un portail) : le reste de l'image est ignore. Si aucune case n'est cochee, rien n'est surveille.";
+  } else {
+    label.textContent = "Zones a ignorer (exclues de la detection)";
+    hint.textContent = "Cliquez sur les cases a exclure (ex. une route, des arbres qui bougent au vent) pour eviter les fausses alertes a cet endroit.";
+  }
+}
+document.querySelectorAll('input[name="f-mask-mode"]').forEach((input) => {
+  input.addEventListener("change", (ev) => updateMotionMaskLabel(ev.target.value));
 });
 
 // --- Motion mask zone editor: an 8x6 grid of toggle cells over a live
@@ -987,6 +1012,7 @@ document.getElementById("edit-form").addEventListener("submit", async (ev) => {
         ssh_port: sshPort,
         motion_enabled: document.getElementById("f-motion-enabled").checked,
         motion_sensitivity: parseInt(document.getElementById("f-motion-sensitivity").value, 10),
+        motion_mask_mode: document.querySelector('input[name="f-mask-mode"]:checked').value,
         motion_mask_grid: motionMaskGrid,
         record_schedule: recordSchedule,
       }),

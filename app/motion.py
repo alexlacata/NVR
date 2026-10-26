@@ -51,18 +51,29 @@ def sensitivity_to_trigger_ratio(sensitivity: int) -> float:
     return _TRIGGER_RATIO_AT_MIN_SENSITIVITY - span * (sensitivity / 100)
 
 
-def mask_grid_to_pixels(mask_grid: list[bool]) -> Optional[bytearray]:
+def mask_grid_to_pixels(mask_grid: list[bool], mask_mode: str = "exclude") -> Optional[bytearray]:
     """Expands the coarse MOTION_GRID_COLS x MOTION_GRID_ROWS UI grid to a
-    DETECT_W x DETECT_H boolean-per-pixel mask (1 = excluded), or None if
-    no zone is masked (the common case - skip masking work entirely)."""
-    if not mask_grid or not any(mask_grid):
+    DETECT_W x DETECT_H boolean-per-pixel mask (1 = excluded from
+    detection), or None if nothing ends up excluded (the common
+    "exclude" case with no cell selected - skip masking work entirely).
+
+    mask_mode="exclude" (default): a selected cell is excluded, the rest
+    of the frame is monitored - a "zone a ignorer".
+    mask_mode="include": a selected cell is the only part monitored, the
+    rest is excluded - a "zone a surveiller". With nothing selected, every
+    pixel ends up excluded (monitors nothing) - a real configuration, not
+    a fallback to "monitor everything".
+    """
+    if mask_mode == "exclude" and not any(mask_grid):
         return None
     pixels = bytearray(_FRAME_BYTES)
     for y in range(DETECT_H):
         grid_row = y * MOTION_GRID_ROWS // DETECT_H
         for x in range(DETECT_W):
             grid_col = x * MOTION_GRID_COLS // DETECT_W
-            if mask_grid[grid_row * MOTION_GRID_COLS + grid_col]:
+            selected = bool(mask_grid) and mask_grid[grid_row * MOTION_GRID_COLS + grid_col]
+            excluded = not selected if mask_mode == "include" else selected
+            if excluded:
                 pixels[y * DETECT_W + x] = 1
     return pixels
 
@@ -214,7 +225,7 @@ async def process_camera(
         return
 
     cam_state = registry._get(camera.id)  # noqa: SLF001 - same module, avoid a public getter+setter pair
-    mask_pixels = mask_grid_to_pixels(camera.motion_mask_grid)
+    mask_pixels = mask_grid_to_pixels(camera.motion_mask_grid, camera.motion_mask_mode)
     if cam_state.prev_frame is not None:
         ratio = compute_changed_ratio(cam_state.prev_frame, frame, mask_pixels)
         triggered = ratio >= sensitivity_to_trigger_ratio(camera.motion_sensitivity)
