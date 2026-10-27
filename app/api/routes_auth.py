@@ -121,6 +121,7 @@ def login(
         key=COOKIE_NAME,
         value=token,
         httponly=True,
+        secure=bool(settings.ssl_certfile and settings.ssl_keyfile) or settings.behind_tls_proxy,
         samesite="lax",
         max_age=settings.session_max_age_seconds,
         path="/",

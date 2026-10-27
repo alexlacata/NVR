@@ -805,6 +805,17 @@ Sur un réseau local/VPN (Tailscale, WireGuard) déjà chiffré de bout en
 bout, HTTP simple reste raisonnable ; ces deux options s'adressent surtout
 à un accès direct depuis Internet.
 
+**Cookie de session et HTTPS** : le cookie de connexion n'est marqué
+`Secure` (envoyé uniquement sur une connexion HTTPS, jamais en clair) que
+si le serveur sait qu'il est bien servi en HTTPS — automatique avec
+`NVR_SSL_CERTFILE`/`NVR_SSL_KEYFILE` (HTTPS natif ci-dessus). Avec un
+reverse proxy qui termine le HTTPS à votre place (le serveur NVR, lui, ne
+reçoit que du HTTP du proxy), ajoutez `NVR_BEHIND_TLS_PROXY=true` pour
+l'indiquer explicitement — ce réglage n'est jamais déduit automatiquement
+d'un en-tête de la requête (`X-Forwarded-Proto`), qui pourrait être
+falsifié par un client pour se faire passer à tort pour une connexion
+sécurisée.
+
 ## Regarder depuis le téléphone
 
 - **Consommation de données du tableau de bord** : chaque vignette de
@@ -987,6 +998,7 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_MOTION_CHECK_INTERVAL_SECONDS` | `5` | Fréquence d'échantillonnage pour la détection de mouvement (caméras avec `motion_enabled`) — idem |
 | `NVR_PORT` | `8000` | Port d'écoute |
 | `NVR_SSL_CERTFILE` / `NVR_SSL_KEYFILE` | *(vide, HTTP)* | Chemins vers un certificat/clé TLS - lancez alors avec `python -m app.main` pour du HTTPS natif (voir *HTTPS* ci-dessus) |
+| `NVR_BEHIND_TLS_PROXY` | `false` | A activer si un reverse proxy termine le HTTPS devant ce serveur (voir *HTTPS* ci-dessus) - marque le cookie de session comme `Secure` |
 | `NVR_BACKUP_DIR` | *(vide, désactivé)* | Dossier de sauvegarde des enregistrements (voir *Sauvegarde* ci-dessus) |
 | `NVR_BACKUP_CHECK_INTERVAL_SECONDS` | `300` | Fréquence de vérification des nouveaux fichiers à copier |
 

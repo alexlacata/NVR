@@ -105,6 +105,17 @@ class Settings(BaseSettings):
     ssl_certfile: str = ""
     ssl_keyfile: str = ""
 
+    # Marks the session cookie as Secure (sent only over HTTPS) when a
+    # reverse proxy in front of this server terminates HTTPS and forwards
+    # plain HTTP here - this process only ever sees HTTP in that case, so
+    # it can't infer HTTPS the way it can from ssl_certfile/ssl_keyfile
+    # (native HTTPS) below. Deliberately a separate, explicit setting
+    # rather than trusting a X-Forwarded-Proto header, which a client
+    # could otherwise spoof to fake a secure connection that isn't one.
+    # Leave false for native HTTPS or a no-HTTPS LAN deployment, where the
+    # cookie must still work over the only scheme actually in use.
+    behind_tls_proxy: bool = False
+
     ffmpeg_binary: str = "ffmpeg"
     ffprobe_binary: str = "ffprobe"
 
