@@ -29,7 +29,7 @@ from app.audit_log import AuditLog
 from app.auth import COOKIE_NAME, AuthService, bootstrap_admin
 from app.backup import BackupStatusTracker, backup_loop
 from app.camera_health import CameraHealthRegistry, camera_health_loop
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.ffmpeg_manager import StreamManager
 from app.login_throttle import LoginThrottle
 from app.motion import MotionRegistry, motion_loop
@@ -131,6 +131,57 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="NVR", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def security_headers_middleware(request: Request, call_next):
+        response = await call_next(request)
+        # Defense-in-depth headers with no legitimate reason to differ by
+        # route, so set unconditionally on every response rather than only
+        # on the API or only on the HTML pages.
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        # DENY (not SAMEORIGIN): nothing in this app embeds itself in an
+        # <iframe>, so there's no legitimate same-origin framing case to
+        # preserve - only a clickjacking one to close.
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "same-origin"
+        # Camera feeds/recordings are the sensitive asset here, not the
+        # browser's own camera/mic/location - this app never requests any
+        # of those, so deny them outright rather than leaving them to
+        # whatever the browser defaults to.
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+        # unsafe-inline on script/style: every page has a small inline
+        # <script type="module"> bootstrapping it (see app/static/*.html) -
+        # rewriting those into external files to drop this is a much larger
+        # change than a security-headers pass warrants. The real payoff
+        # here is frame-ancestors (clickjacking, redundant with
+        # X-Frame-Options for older browsers) and locking down
+        # connect/img/media/object-src to same-origin, which still blocks a
+        # reflected/stored-XSS payload from exfiltrating data to or loading
+        # script from an attacker-controlled origin.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "media-src 'self'; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "object-src 'none'; "
+            "base-uri 'self'"
+        )
+        settings: Settings = request.app.state.settings
+        if bool(settings.ssl_certfile and settings.ssl_keyfile) or settings.behind_tls_proxy:
+            # Only when HTTPS is actually in use (native or behind a TLS
+            # proxy) - same condition as the session cookie's Secure flag.
+            # A browser ignores this header entirely unless it already
+            # arrived over HTTPS, but sending it on a plain-HTTP LAN
+            # deployment that will never have a valid cert would be
+            # actively harmful if that deployment later serves a page over
+            # HTTPS by accident (a misconfigured proxy): it would force
+            # HTTPS for a year with no way back without clearing browser
+            # state.
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):

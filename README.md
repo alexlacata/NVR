@@ -816,6 +816,17 @@ d'un en-tête de la requête (`X-Forwarded-Proto`), qui pourrait être
 falsifié par un client pour se faire passer à tort pour une connexion
 sécurisée.
 
+**En-têtes de sécurité HTTP** : chaque réponse (API comme pages web)
+inclut `X-Frame-Options: DENY` et une CSP avec `frame-ancestors 'none'`
+(empêche un autre site d'intégrer l'appli dans une `<iframe>` invisible
+pour piéger un clic — attaque dite de clickjacking), `X-Content-Type-Options:
+nosniff`, une `Content-Security-Policy` qui limite scripts/styles/images/
+médias à la même origine, et `Permissions-Policy` qui désactive caméra/
+micro/géolocalisation du navigateur (inutiles ici — l'appli parle
+directement aux caméras IP, pas via le navigateur). `Strict-Transport-
+Security` s'ajoute automatiquement dès que le HTTPS est actif (natif ou
+`NVR_BEHIND_TLS_PROXY`), par cohérence avec le cookie de session ci-dessus.
+
 ## Regarder depuis le téléphone
 
 - **Consommation de données du tableau de bord** : chaque vignette de
