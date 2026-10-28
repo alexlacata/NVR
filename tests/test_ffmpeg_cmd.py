@@ -96,3 +96,43 @@ def test_srt_live_leg_is_video_only_and_copy(tmp_path: Path):
     cmd = build_live_cmd("ffmpeg", cam, tmp_path, hls_segment_seconds=2, hls_list_size=6)
     assert "-c:v" in cmd and "copy" in cmd
     assert "0:a" not in " ".join(cmd)
+
+
+def test_hw_encoder_used_when_resolved_and_reencode_needed(tmp_path: Path):
+    cam = _camera(live_max_bitrate_kbps=800)
+    cmd = build_live_cmd(
+        "ffmpeg", cam, tmp_path, hls_segment_seconds=2, hls_list_size=6, hw_encoder="h264_v4l2m2m"
+    )
+    assert "h264_v4l2m2m" in cmd
+    assert "libx264" not in cmd
+    # Not supported by h264_v4l2m2m (a fixed hardware pipeline, not
+    # libavcodec's software rate-distortion options) - must not be sent.
+    assert "-preset" not in cmd
+    assert "-tune" not in cmd
+    assert cmd[cmd.index("-b:v") + 1] == "800k"
+
+
+def test_hw_encoder_gets_a_default_bitrate_when_no_cap_set(tmp_path: Path):
+    cam = _camera(source_type=SourceType.test, url="test:pattern")
+    cmd = build_record_cmd("ffmpeg", cam, tmp_path, segment_seconds=600, hw_encoder="h264_v4l2m2m")
+    assert "h264_v4l2m2m" in cmd
+    assert "-b:v" in cmd  # the hw encoder's own low default would otherwise apply
+
+
+def test_hw_encoder_not_used_for_a_plain_stream_copy(tmp_path: Path):
+    # Still copy_ok with no cap/scale set - hw_encoder is irrelevant here,
+    # it should never appear even though one was resolved at startup.
+    cmd = build_live_cmd(
+        "ffmpeg", _camera(), tmp_path, hls_segment_seconds=2, hls_list_size=6, hw_encoder="h264_v4l2m2m"
+    )
+    assert "h264_v4l2m2m" not in cmd
+    assert "-c:v" in cmd and "copy" in cmd
+
+
+def test_no_hw_encoder_falls_back_to_libx264(tmp_path: Path):
+    cam = _camera(live_max_bitrate_kbps=800)
+    cmd = build_live_cmd(
+        "ffmpeg", cam, tmp_path, hls_segment_seconds=2, hls_list_size=6, hw_encoder=None
+    )
+    assert "libx264" in cmd
+    assert "h264_v4l2m2m" not in cmd

@@ -177,9 +177,11 @@ code n'est nécessaire.
    sudo usermod -aG docker $USER   # puis reconnectez-vous
    sudo apt install -y docker-compose-plugin
    ```
-4. **Suivre le démarrage rapide Docker** ci-dessus tel quel (`git clone`,
-   `.env`, `docker compose up -d --build`) — rien de spécifique au Pi dans
-   le `docker-compose.yml`.
+4. **Suivre le démarrage rapide Docker** ci-dessus, en partant de
+   `.env.pi.example` plutôt que `.env.example` (`cp .env.pi.example .env`)
+   pour des réglages par défaut mieux adaptés au Pi — voir
+   *Optimisations Raspberry Pi* ci-dessous. Le script
+   `pi-image/firstboot.sh` plus bas le fait automatiquement.
 
 **Charge CPU** : l'enregistrement copie le flux caméra tel quel sur le
 disque (`-c copy`, pas de ré-encodage) dès que la caméra le permet — un Pi
@@ -187,11 +189,37 @@ peut donc enregistrer plusieurs caméras en continu sans effort notable,
 même en 1080p, l'essentiel du travail étant de l'écriture disque, pas du
 calcul. Le direct fait de même *sauf* si vous configurez une limite de
 bitrate/résolution (section *Bande passante du direct*, pensée pour une
-liaison 4G) : dans ce cas ce flux est ré-encodé en logiciel (x264), ce qui
-consomme du CPU. Laissez cette limite vide pour un visionnage sur réseau
-local (le direct reste alors une simple copie, comme l'enregistrement), et
-n'activez-la que pour les caméras réellement consultées à distance sur une
-liaison limitée.
+liaison 4G) : dans ce cas ce flux est ré-encodé, ce qui consomme du CPU —
+voir juste ci-dessous comment le Pi 4 évite ça grâce à son encodeur
+matériel.
+
+### Optimisations Raspberry Pi
+
+- **Encodage vidéo matériel (Pi 4 et antérieurs)** : quand un flux doit
+  être ré-encodé (limite de bitrate/résolution du direct, ou caméra
+  USB/HTTP qui ne permet jamais la copie directe), le serveur détecte au
+  démarrage l'encodeur matériel du Pi (`h264_v4l2m2m`, piloté par le GPU)
+  et l'utilise à la place du logiciel (x264), ce qui libère le CPU pour
+  le reste. Entièrement automatique (réglage `NVR_HW_ENCODER=auto`, la
+  valeur par défaut) : un vrai test d'encodage est lancé au démarrage, et
+  le serveur retombe sur le logiciel si ça échoue — notamment sur un
+  **Raspberry Pi 5**, qui n'a plus ce bloc matériel (decodage uniquement),
+  ou sur un PC/serveur classique. L'état actuel (matériel ou logiciel)
+  s'affiche dans *Paramètres → Réglages techniques avancés*.
+  Avec Docker, le conteneur a besoin d'un accès explicite aux
+  périphériques `/dev/video1x` du Pi pour que l'encodeur matériel serve à
+  quelque chose — `pi-image/firstboot.sh` s'en occupe automatiquement
+  (il détecte les périphériques présents et génère un
+  `docker-compose.override.yml`) ; avec une installation Docker manuelle,
+  décommentez le bloc correspondant dans `docker-compose.yml`.
+- **Cadences des tâches de fond plus légères** : `.env.pi.example`
+  espace un peu plus la détection de mouvement, le bilan de santé caméra
+  et la génération de vignettes que les valeurs par défaut (pensées pour
+  un serveur x86 classique), pour laisser plus de marge de CPU quand
+  plusieurs caméras tournent en même temps sur un Pi — sans effet
+  perceptible sur la réactivité (détection de mouvement toujours sous la
+  dizaine de secondes). Avec une seule caméra, les valeurs par défaut de
+  `.env.example` conviennent tout aussi bien sur un Pi.
 
 ### Créer une image prête à flasher (boîtier NVR qui démarre sur son disque)
 
@@ -1007,6 +1035,8 @@ Deux topologies possibles selon où vit le disque dur physiquement :
 | `NVR_THUMBNAIL_INTERVAL_SECONDS` | `60` | Intervalle par défaut entre deux vignettes (secondes), surchargeable par caméra — idem |
 | `NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS` | `30` | Fréquence de vérification des nouveaux enregistrements à traiter — idem |
 | `NVR_MOTION_CHECK_INTERVAL_SECONDS` | `5` | Fréquence d'échantillonnage pour la détection de mouvement (caméras avec `motion_enabled`) — idem |
+| `NVR_CAMERA_HEALTH_CHECK_INTERVAL_SECONDS` | `15` | Fréquence de vérification de l'état des caméras (en ligne/hors ligne) — idem |
+| `NVR_HW_ENCODER` | `auto` | Encodeur vidéo utilisé pour tout flux à ré-encoder : `auto` détecte au démarrage l'encodeur matériel du Raspberry Pi (`h264_v4l2m2m`) et retombe sur le logiciel (`libx264`) s'il est absent (PC/serveur x86, Pi 5) ; `software` ou `h264_v4l2m2m` pour forcer l'un ou l'autre — voir *Optimisations Raspberry Pi* ci-dessus |
 | `NVR_PORT` | `8000` | Port d'écoute |
 | `NVR_SSL_CERTFILE` / `NVR_SSL_KEYFILE` | *(vide, HTTP)* | Chemins vers un certificat/clé TLS - lancez alors avec `python -m app.main` pour du HTTPS natif (voir *HTTPS* ci-dessus) |
 | `NVR_BEHIND_TLS_PROXY` | `false` | A activer si un reverse proxy termine le HTTPS devant ce serveur (voir *HTTPS* ci-dessus) - marque le cookie de session comme `Secure` |

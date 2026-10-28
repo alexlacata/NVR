@@ -116,6 +116,17 @@ class Settings(BaseSettings):
     # cookie must still work over the only scheme actually in use.
     behind_tls_proxy: bool = False
 
+    # Hardware video encoding (Raspberry Pi 4 and earlier - the bcm2835-codec
+    # driver's h264_v4l2m2m encoder): used instead of the software libx264
+    # encoder whenever a stream must be re-encoded (a live-view bitrate cap/
+    # resize, or a USB/HTTP/test source). "auto" (default) probes for it at
+    # startup and only uses it if a real test encode succeeds - needed
+    # because a Raspberry Pi 5 has no hardware encoder at all (only
+    # decode), yet runs the exact same ffmpeg build as a Pi 4 that does.
+    # "software" always uses libx264; "h264_v4l2m2m" skips the probe and
+    # forces it on.
+    hw_encoder: str = "auto"
+
     ffmpeg_binary: str = "ffmpeg"
     ffprobe_binary: str = "ffprobe"
 

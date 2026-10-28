@@ -39,6 +39,14 @@ def get_stream_manager(request: Request) -> StreamManager:
     return request.app.state.stream_manager
 
 
+def get_hw_encoder(request: Request) -> Optional[str]:
+    """The hardware video encoder resolved at startup (see
+    app.hw_encoder.detect_hw_encoder), or None when falling back to
+    software (libx264) - e.g. on a Raspberry Pi 5, a PC, or any host
+    without a working h264_v4l2m2m."""
+    return getattr(request.app.state, "hw_encoder", None)
+
+
 def get_auth_service(request: Request) -> AuthService:
     return request.app.state.auth_service
 

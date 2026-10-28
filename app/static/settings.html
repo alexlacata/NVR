@@ -188,6 +188,7 @@
               </div>
             </div>
             <div class="hint">Les cameras redemarrent brievement apres l'enregistrement pour appliquer les nouveaux reglages.</div>
+            <div class="hint" id="hw-encoder-status" style="margin-top:4px"></div>
           </div>
         </details>
 
@@ -722,6 +723,14 @@ async function loadServerSettings() {
   document.getElementById("s-thumb-check-interval").value = s.thumbnail_check_interval_seconds;
   document.getElementById("s-retention-check-interval").value = s.retention_check_interval_seconds;
   updateRetentionDisplay();
+
+  const info = await apiJson("/api/system").catch(() => null);
+  const hwEl = document.getElementById("hw-encoder-status");
+  if (info) {
+    hwEl.textContent = info.video_encoder === "hardware"
+      ? "Encodage video : materiel (accelere par le GPU) - utilise quand une camera a besoin d'etre re-encodee (limite de debit, redimensionnement du direct, camera USB...)."
+      : "Encodage video : logiciel (CPU) - aucun encodeur materiel detecte sur ce serveur (normal sur PC/serveur classique, ou sur Raspberry Pi 5).";
+  }
 }
 
 // Keeps the preset buttons' highlighted state and the explanatory hint in

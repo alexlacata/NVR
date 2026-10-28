@@ -160,8 +160,12 @@ def _mtime_age(path: Path) -> Optional[float]:
 class StreamManager:
     """Owns the record/live ffmpeg legs for every camera, keyed by camera id."""
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, hw_encoder: Optional[str] = None):
         self._settings = settings
+        # Resolved once at startup (see app.hw_encoder.detect_hw_encoder) -
+        # not re-probed per camera or per restart, since it depends only on
+        # the host's hardware/ffmpeg build, not on any camera's config.
+        self._hw_encoder = hw_encoder
         self._legs: dict[str, dict[str, _Leg]] = {}
         self._configs: dict[str, Camera] = {}
 
@@ -200,7 +204,8 @@ class StreamManager:
         record_leg = _Leg(
             camera.id, "record",
             cmd_factory=lambda: build_record_cmd(
-                self._settings.ffmpeg_binary, camera, rec_dir, self._settings.segment_seconds
+                self._settings.ffmpeg_binary, camera, rec_dir, self._settings.segment_seconds,
+                hw_encoder=self._hw_encoder,
             ),
             stall_path_factory=lambda: rec_dir,
             stall_timeout=max(self._settings.segment_seconds * 2, 60),
@@ -214,6 +219,7 @@ class StreamManager:
             cmd_factory=lambda: build_live_cmd(
                 self._settings.ffmpeg_binary, camera, hls_dir,
                 self._settings.hls_segment_seconds, self._settings.hls_list_size,
+                hw_encoder=self._hw_encoder,
             ),
             stall_path_factory=lambda: hls_dir / "stream.m3u8",
             stall_timeout=max(self._settings.hls_segment_seconds * 8, 30),

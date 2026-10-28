@@ -19,7 +19,7 @@ REPO_URL="${1:-$DEFAULT_REPO_URL}"
 BRANCH="${2:-$DEFAULT_BRANCH}"
 INSTALL_DIR="${NVR_INSTALL_DIR:-$HOME/nvr}"
 USER="${USER:-$(whoami)}"
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 
 log() { echo -e "\n[etape $1/$TOTAL_STEPS] $2"; }
 
@@ -64,7 +64,7 @@ log 3 "Configuration"
 NEW_ENV=0
 if [ ! -f .env ]; then
   NEW_ENV=1
-  cp .env.example .env
+  cp .env.pi.example .env
   SECRET=$(openssl rand -hex 32)
   sed -i "s#^NVR_SECRET_KEY=.*#NVR_SECRET_KEY=${SECRET}#" .env
   echo "Fichier de configuration cree."
@@ -90,7 +90,34 @@ else
   echo "Deja pret."
 fi
 
-log 5 "Demarrage automatique au redemarrage"
+log 5 "Acces a l'encodeur video materiel (si present)"
+# Raspberry Pi 4 et anterieurs seulement - le Pi 5 n'a plus ce bloc
+# materiel (decodage uniquement) et n'aura simplement aucun /dev/video*
+# "codec" ici, ce qui est normal : le serveur retombe alors tout seul sur
+# l'encodage logiciel (voir NVR_HW_ENCODER dans le README). Un override
+# Docker Compose separe plutot qu'edit direct de docker-compose.yml, pour
+# rester idempotent et ne jamais entrer en conflit avec une mise a jour du
+# fichier suivi par git.
+HW_VIDEO_DEVICES=$(for n in /dev/video1[0-9]; do [ -e "$n" ] && echo "$n"; done)
+OVERRIDE_FILE=docker-compose.override.yml
+if [ -n "$HW_VIDEO_DEVICES" ]; then
+  {
+    echo "services:"
+    echo "  nvr:"
+    echo "    group_add:"
+    echo "      - video"
+    echo "    devices:"
+    for n in $HW_VIDEO_DEVICES; do
+      echo "      - ${n}:${n}"
+    done
+  } > "$OVERRIDE_FILE"
+  echo "Trouve : $(echo "$HW_VIDEO_DEVICES" | tr '\n' ' ') - rendu accessible au conteneur."
+else
+  rm -f "$OVERRIDE_FILE"
+  echo "Aucun encodeur materiel detecte sur cet hote (normal sur Pi 5) - encodage logiciel."
+fi
+
+log 6 "Demarrage automatique au redemarrage"
 SERVICE_FILE=/etc/systemd/system/nvr.service
 sudo tee "$SERVICE_FILE" >/dev/null <<UNIT
 [Unit]
@@ -114,7 +141,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable nvr.service
 echo "Fait : le NVR redemarrera tout seul avec le Raspberry Pi."
 
-log 6 "Demarrage du NVR"
+log 7 "Demarrage du NVR"
 sudo systemctl restart nvr.service
 echo "En cours de demarrage (peut prendre 10-20 secondes la premiere fois)..."
 

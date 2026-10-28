@@ -17,6 +17,18 @@ services:
       # lieu de recreer silencieusement le dossier en local. Voir le
       # README, section "Ou brancher le disque dur ?".
       NVR_REQUIRE_EXISTING_DATA_DIR: ${NVR_REQUIRE_EXISTING_DATA_DIR:-false}
+      # Encodeur video materiel (Raspberry Pi 4 et anterieurs - voir le
+      # README, section "Optimisations Raspberry Pi"). "auto" (defaut) le
+      # detecte au demarrage et retombe sur le logiciel s'il est absent
+      # (toujours le cas sur PC/serveur x86, et sur Pi 5).
+      NVR_HW_ENCODER: ${NVR_HW_ENCODER:-auto}
+      # Cadences des taches de fond (detection de mouvement, bilan sante
+      # camera, generation de vignettes) - uniquement utile a assouplir sur
+      # un Pi avec plusieurs cameras ; voir .env.pi.example pour des
+      # valeurs recommandees dans ce cas.
+      NVR_MOTION_CHECK_INTERVAL_SECONDS: ${NVR_MOTION_CHECK_INTERVAL_SECONDS:-5}
+      NVR_CAMERA_HEALTH_CHECK_INTERVAL_SECONDS: ${NVR_CAMERA_HEALTH_CHECK_INTERVAL_SECONDS:-15}
+      NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS: ${NVR_THUMBNAIL_CHECK_INTERVAL_SECONDS:-30}
     volumes:
       # Remplacez le chemin de gauche par le point de montage de votre
       # disque dur, par ex. /mnt/disque-nvr:/data
@@ -24,6 +36,15 @@ services:
     # Pour une camera USB, decommentez et adaptez :
     # devices:
     #   - /dev/video0:/dev/video0
+    # Pour l'encodeur video materiel d'un Raspberry Pi 4 (NVR_HW_ENCODER
+    # ci-dessus) : decommentez (inutile sur Pi 5, qui n'a pas ce
+    # peripherique - pi-image/firstboot.sh le fait automatiquement) :
+    # group_add:
+    #   - video
+    # devices:
+    #   - /dev/video10:/dev/video10
+    #   - /dev/video11:/dev/video11
+    #   - /dev/video12:/dev/video12
     # Pour que "Rechercher sur le reseau" (decouverte ONVIF / WS-Discovery)
     # trouve les cameras : le reseau bridge par defaut ne transmet pas le
     # trafic multicast. Decommentez (Linux uniquement ; le mapping "ports"

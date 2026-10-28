@@ -98,19 +98,37 @@ def _input_spec(source_type: SourceType, url: str) -> InputSpec:
     raise ValueError(f"Unknown source type: {source_type}")
 
 
+#  h264_v4l2m2m has no software-only concept of a quality preset and
+# doesn't support -tune zerolatency - it's a fixed hardware pipeline that
+# the driver, not libavcodec, controls. It also needs an explicit bitrate:
+# left unset, the driver's own default is low enough to look noticeably
+# worse than libx264's default (quality-targeted, not bitrate-targeted)
+# behavior, so a cap below applies to it as much as it does to libx264.
+_HW_ENCODER_DEFAULT_BITRATE_KBPS = 4000
+
+
 def _video_codec_args(
     gop_seconds: int,
     max_bitrate_kbps: Optional[int] = None,
     scale: Optional[str] = None,
+    hw_encoder: Optional[str] = None,
 ) -> list[str]:
-    args = [
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-tune", "zerolatency",
-        "-pix_fmt", "yuv420p",
-        "-g", str(gop_seconds * 25),
-        "-r", "25",
-    ]
+    if hw_encoder:
+        args = [
+            "-c:v", hw_encoder,
+            "-pix_fmt", "yuv420p",
+            "-g", str(gop_seconds * 25),
+            "-r", "25",
+        ]
+    else:
+        args = [
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-tune", "zerolatency",
+            "-pix_fmt", "yuv420p",
+            "-g", str(gop_seconds * 25),
+            "-r", "25",
+        ]
     if scale:
         width, height = scale.split("x")
         args += ["-vf", f"scale={width}:{height}"]
@@ -120,6 +138,8 @@ def _video_codec_args(
             "-maxrate", f"{max_bitrate_kbps}k",
             "-bufsize", f"{max_bitrate_kbps * 2}k",
         ]
+    elif hw_encoder:
+        args += ["-b:v", f"{_HW_ENCODER_DEFAULT_BITRATE_KBPS}k"]
     return args
 
 
@@ -131,6 +151,7 @@ def build_record_cmd(
     camera: Camera,
     out_dir: Path,
     segment_seconds: int,
+    hw_encoder: Optional[str] = None,
 ) -> list[str]:
     spec = _input_spec(camera.source_type, camera.url)
     maps = list(spec.video_map)
@@ -140,7 +161,7 @@ def build_record_cmd(
     if spec.copy_ok:
         codec_args = ["-c", "copy"]
     else:
-        codec_args = _video_codec_args(gop_seconds=2)
+        codec_args = _video_codec_args(gop_seconds=2, hw_encoder=hw_encoder)
         codec_args += _AUDIO_CODEC_ARGS if spec.audio_map else ["-an"]
 
     out_pattern = str(out_dir / "%Y-%m-%d_%H-%M-%S.mp4")
@@ -166,6 +187,7 @@ def build_live_cmd(
     out_dir: Path,
     hls_segment_seconds: int,
     hls_list_size: int,
+    hw_encoder: Optional[str] = None,
 ) -> list[str]:
     url = camera.live_url or camera.url
     spec = _input_spec(camera.source_type, url)
@@ -181,6 +203,7 @@ def build_live_cmd(
             gop_seconds=hls_segment_seconds,
             max_bitrate_kbps=camera.live_max_bitrate_kbps,
             scale=camera.live_scale,
+            hw_encoder=hw_encoder,
         )
 
     playlist = str(out_dir / "stream.m3u8")

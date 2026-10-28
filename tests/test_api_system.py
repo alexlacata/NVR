@@ -22,3 +22,4 @@ async def test_system_info_includes_health_fields(client):
     assert "cpu_load_percent" in data
     assert "memory_percent" in data
     assert "cpu_temperature_celsius" in data
+    assert data["video_encoder"] in ("hardware", "software")

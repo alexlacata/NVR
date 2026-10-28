@@ -31,6 +31,7 @@ from app.backup import BackupStatusTracker, backup_loop
 from app.camera_health import CameraHealthRegistry, camera_health_loop
 from app.config import Settings, get_settings
 from app.ffmpeg_manager import StreamManager
+from app.hw_encoder import detect_hw_encoder
 from app.login_throttle import LoginThrottle
 from app.motion import MotionRegistry, motion_loop
 from app.notification_settings_store import NotificationSettingsStore
@@ -79,7 +80,8 @@ async def lifespan(app: FastAPI):
         max_requests=settings.rate_limit_max_requests,
         window_seconds=settings.rate_limit_window_seconds,
     )
-    app.state.stream_manager = StreamManager(settings)
+    app.state.hw_encoder = await detect_hw_encoder(settings.ffmpeg_binary, settings.hw_encoder)
+    app.state.stream_manager = StreamManager(settings, hw_encoder=app.state.hw_encoder)
     app.state.ptz_registry = PTZRegistry()
     app.state.motion_registry = MotionRegistry(settings.motion_dir)
     app.state.notification_settings_store = NotificationSettingsStore(
