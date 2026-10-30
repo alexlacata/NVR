@@ -9,9 +9,9 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="NVR">
+<meta name="apple-mobile-web-app-title" content="Fléau">
 <meta name="mobile-web-app-capable" content="yes">
-<title>NVR - Camera</title>
+<title>Fléau - Camera</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -282,7 +282,7 @@ function setBadge(state) {
 async function loadCamera() {
   const cam = await apiJson(`/api/cameras/${encodeURIComponent(camId)}`);
   document.getElementById("cam-title").textContent = cam.name;
-  document.title = `NVR - ${cam.name}`;
+  document.title = `Fléau - ${cam.name}`;
   setBadge(cam.status.state);
 
   const linksWrap = document.getElementById("cam-device-links");

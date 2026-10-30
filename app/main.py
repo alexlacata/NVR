@@ -132,7 +132,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="NVR", lifespan=lifespan)
+    app = FastAPI(title="Fléau", lifespan=lifespan)
 
     @app.middleware("http")
     async def security_headers_middleware(request: Request, call_next):

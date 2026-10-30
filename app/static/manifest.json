@@ -1,6 +1,6 @@
 {
-  "name": "NVR",
-  "short_name": "NVR",
+  "name": "Fléau",
+  "short_name": "Fléau",
   "description": "Enregistreur video reseau auto-heberge : cameras, direct et relecture depuis le telephone ou l'ordinateur.",
   "start_url": "/index.html",
   "scope": "/",

@@ -51,7 +51,7 @@ def verify_totp(secret: str, code: str, window: int = 1, at: Optional[float] = N
     return False
 
 
-def provisioning_uri(secret: str, username: str, issuer: str = "NVR") -> str:
+def provisioning_uri(secret: str, username: str, issuer: str = "Fléau") -> str:
     """otpauth:// URI a QR code can encode for an authenticator app."""
     label = urllib.parse.quote(f"{issuer}:{username}")
     params = urllib.parse.urlencode({
