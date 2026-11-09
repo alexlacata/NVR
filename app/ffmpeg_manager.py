@@ -301,6 +301,3 @@ class StreamManager:
             restart_count=record_info.restart_count + live_info.restart_count,
             started_at=started_at,
         )
-
-    def all_status(self) -> dict[str, CameraStatus]:
-        return {cid: self.status(cid) for cid in self._legs}
