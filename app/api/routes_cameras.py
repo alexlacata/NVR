@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import shutil
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
+from app.camera_probe import probe_camera_source
+from app.config import Settings
 from app.deps import (
     ensure_camera_access,
     get_motion_registry,
@@ -15,12 +19,23 @@ from app.deps import (
     require_cameras_manage,
 )
 from app.ffmpeg_manager import StreamManager
-from app.models import Camera, CameraCreate, CameraUpdate, CameraWithStatus, Permission, User, can_access_camera, has_permission
+from app.models import Camera, CameraCreate, CameraUpdate, CameraWithStatus, Permission, SourceType, User, can_access_camera, has_permission
 from app.motion import MotionRegistry
 from app.ptz_registry import PTZRegistry
 from app.store import CameraNotFound, CameraStore, DuplicateCameraId
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"], dependencies=[Depends(require_auth)])
+
+
+class TestConnectionRequest(BaseModel):
+    source_type: SourceType
+    url: str = Field(min_length=1, max_length=2000)
+
+
+class TestConnectionResult(BaseModel):
+    ok: bool
+    resolution: Optional[str] = None
+    detail: Optional[str] = None
 
 
 def _with_status(camera: Camera, manager: StreamManager, user: User) -> CameraWithStatus:
@@ -57,6 +72,18 @@ async def create_camera(
         raise HTTPException(status_code=409, detail="Cet identifiant de camera existe deja")
     await manager.reconcile(store.list())
     return _with_status(camera, manager, user)
+
+
+@router.post("/test-connection", response_model=TestConnectionResult, dependencies=[Depends(require_cameras_manage)])
+async def test_connection(
+    payload: TestConnectionRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """Tries to read a video stream from `url` without creating a camera -
+    used by the add-camera wizard to confirm the address/credentials work
+    before saving, instead of only finding out later from the logs."""
+    result = await probe_camera_source(settings.ffprobe_binary, payload.source_type, payload.url)
+    return TestConnectionResult(ok=result.ok, resolution=result.resolution, detail=result.detail)
 
 
 @router.get("/{camera_id}", response_model=CameraWithStatus)

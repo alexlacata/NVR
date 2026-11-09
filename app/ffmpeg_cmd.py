@@ -43,7 +43,7 @@ class InputSpec:
     copy_ok: bool
 
 
-def _input_spec(source_type: SourceType, url: str) -> InputSpec:
+def input_spec(source_type: SourceType, url: str) -> InputSpec:
     if source_type == SourceType.rtsp:
         return InputSpec(
             pre_args=["-rtsp_transport", "tcp", "-fflags", "+genpts"],
@@ -153,7 +153,7 @@ def build_record_cmd(
     segment_seconds: int,
     hw_encoder: Optional[str] = None,
 ) -> list[str]:
-    spec = _input_spec(camera.source_type, camera.url)
+    spec = input_spec(camera.source_type, camera.url)
     maps = list(spec.video_map)
     if spec.audio_map:
         maps += spec.audio_map
@@ -190,7 +190,7 @@ def build_live_cmd(
     hw_encoder: Optional[str] = None,
 ) -> list[str]:
     url = camera.live_url or camera.url
-    spec = _input_spec(camera.source_type, url)
+    spec = input_spec(camera.source_type, url)
 
     # A bitrate cap or forced resolution (used to fit the live view through a
     # constrained/metered uplink, e.g. a cellular router) requires

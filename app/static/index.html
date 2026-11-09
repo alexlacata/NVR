@@ -188,74 +188,210 @@ function closeModal() {
   document.getElementById("modal-root").innerHTML = "";
 }
 
+const CAMERA_SOURCE_TYPE_OPTIONS = [
+  ["rtsp", "RTSP (la plupart des cameras IP)"],
+  ["rtmp", "RTMP (flux envoye par un boitier/encodeur)"],
+  ["srt", "SRT (liaison a faible qualite reseau, ex. 4G)"],
+  ["http", "HTTP / MJPEG (cameras plus anciennes)"],
+  ["usb", "USB (camera branchee directement au boitier)"],
+  ["test", "Test (mire, sans camera reelle)"],
+];
+
+function buildSourceTypeSelect() {
+  return el("select", {}, CAMERA_SOURCE_TYPE_OPTIONS.map(([value, label]) => el("option", { value }, label)));
+}
+
+// Add-camera wizard: three short steps instead of one long form, since a
+// single form with every field visible at once (even with advanced ones
+// collapsed) still reads as overwhelming to someone who's never set up an
+// RTSP camera before. Each step only shows what's relevant right then.
 function openAddModal() {
   const root = document.getElementById("modal-root");
-  const errorEl = el("div", { class: "error-msg" });
+  const state = {
+    step: 1,
+    findMethod: null, // "scan" | "brand" | "manual"
+    sourceType: "rtsp",
+    url: "",
+    liveUrl: "",
+    name: "",
+    record: true,
+    testing: false,
+    testResult: null, // { ok, resolution, detail } | null, from /api/cameras/test-connection
+  };
 
-  const nameInput = el("input", { type: "text", required: "" });
-  const typeSelect = el("select", {}, [
-    el("option", { value: "rtsp" }, "RTSP (la plupart des cameras IP)"),
-    el("option", { value: "rtmp" }, "RTMP (flux envoye par un boitier/encodeur)"),
-    el("option", { value: "srt" }, "SRT (liaison a faible qualite reseau, ex. 4G)"),
-    el("option", { value: "http" }, "HTTP / MJPEG (cameras plus anciennes)"),
-    el("option", { value: "usb" }, "USB (camera branchee directement au boitier)"),
-    el("option", { value: "test" }, "Test (mire, sans camera reelle)"),
-  ]);
-  const urlInput = el("input", { type: "text", placeholder: "rtsp://utilisateur:motdepasse@192.168.1.50:554/stream1" });
-  const liveUrlInput = el("input", { type: "text", placeholder: "(optionnel) version allegee du flux pour le direct" });
-  const recordCheckbox = el("input", { type: "checkbox", checked: "" });
+  const stepLabelEl = el("div", { class: "hint", style: "margin:0 16px 6px" });
+  const modalBody = el("div", { style: "padding:0 16px 16px" });
 
-  const brandWidget = buildBrandUrlWidget({
-    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("Adresse renseignee"); },
-    onUseLiveUrl: (url) => { liveUrlInput.value = url; toast("Adresse du direct renseignee"); },
-  });
-  const onvifWidget = buildOnvifDiscoveryWidget({
-    onUseUrl: (url) => { urlInput.value = url; typeSelect.value = "rtsp"; toast("Adresse trouvee automatiquement"); },
-  });
+  function setStep(n) {
+    state.step = n;
+    render();
+  }
 
-  const form = el("form", { class: "form-grid", onsubmit: async (ev) => {
-    ev.preventDefault();
-    errorEl.textContent = "";
-    try {
-      await apiJson("/api/cameras", {
-        method: "POST",
-        body: JSON.stringify({
-          name: nameInput.value,
-          source_type: typeSelect.value,
-          url: urlInput.value,
-          live_url: liveUrlInput.value || null,
-          record: recordCheckbox.checked,
-        }),
+  function onUrlFound(url, sourceType) {
+    state.url = url;
+    state.sourceType = sourceType || "rtsp";
+    state.testResult = null;
+    setStep(2);
+  }
+
+  function renderStep1() {
+    const methodBtn = (key, label) => el("button", {
+      type: "button",
+      class: state.findMethod === key ? "btn" : "btn secondary",
+      onclick: () => { state.findMethod = key; render(); },
+    }, label);
+
+    const container = el("div", {}, [
+      el("p", { class: "hint", style: "margin-top:0" }, "Comment voulez-vous trouver l'adresse de votre camera ?"),
+      el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px" }, [
+        methodBtn("scan", "Rechercher sur le reseau"),
+        methodBtn("brand", "Je connais la marque"),
+        methodBtn("manual", "J'ai deja l'adresse complete"),
+      ]),
+    ]);
+
+    if (state.findMethod === "scan") {
+      container.appendChild(buildOnvifDiscoveryWidget({ onUseUrl: (url) => onUrlFound(url, "rtsp") }));
+    } else if (state.findMethod === "brand") {
+      container.appendChild(buildBrandUrlWidget({
+        onUseUrl: (url) => onUrlFound(url, "rtsp"),
+        onUseLiveUrl: (url) => { state.liveUrl = url; toast("Adresse du direct renseignee"); },
+      }));
+    } else if (state.findMethod === "manual") {
+      const typeSelect = buildSourceTypeSelect();
+      typeSelect.value = state.sourceType;
+      const urlInput = el("input", {
+        type: "text", value: state.url,
+        placeholder: "rtsp://utilisateur:motdepasse@192.168.1.50:554/stream1",
       });
-      closeModal();
-      await loadCameras();
-    } catch (e) {
-      errorEl.textContent = e.message;
+      container.appendChild(el("div", { class: "form-grid" }, [
+        el("div", {}, [el("label", {}, "Type de connexion"), typeSelect]),
+        el("div", {}, [el("label", {}, "Adresse de la camera"), urlInput,
+          el("div", { class: "hint" }, "Une simple adresse IP (ex. 192.168.1.50 ou 192.168.1.50:554/stream1) suffit, rtsp:// est ajoute automatiquement.")]),
+        el("div", { class: "actions" }, [
+          el("button", { type: "button", class: "btn", onclick: () => {
+            if (!urlInput.value.trim()) { toast("L'adresse est requise"); return; }
+            onUrlFound(urlInput.value.trim(), typeSelect.value);
+          }}, "Continuer"),
+        ]),
+      ]));
     }
-  }}, [
-    el("div", {}, [el("label", {}, "Nom"), nameInput,
-      el("div", { class: "hint" }, "Un nom pour la reconnaitre facilement, ex. \"Entree\" ou \"Jardin\".")]),
-    el("div", {}, [el("label", {}, "Type de connexion"), typeSelect,
-      el("div", { class: "hint" }, "Pas sur ? Laissez sur RTSP et utilisez l'assistant ci-dessous pour trouver l'adresse automatiquement.")]),
-    el("div", {}, [el("label", {}, "Adresse de la camera (pour l'enregistrement)"), urlInput,
-      el("div", { class: "hint" }, "Une simple adresse IP (ex. 192.168.1.50 ou 192.168.1.50:554/stream1) suffit, rtsp:// est ajoute automatiquement.")]),
-    el("div", {}, [el("label", {}, "Adresse pour le direct, en qualite reduite (optionnel)"), liveUrlInput,
-      el("div", { class: "hint" }, "Laisser vide pour utiliser la meme adresse partout.")]),
-    el("div", { class: "checkbox-row" }, [recordCheckbox, el("label", {}, "Enregistrer en continu sur le disque")]),
-    el("div", { class: "hint" }, "Les reglages plus avances (zoom motorise, detection de mouvement, economie de donnees...) se configurent ensuite sur la page de la camera - vous pourrez y revenir a tout moment."),
-    errorEl,
-    el("div", { class: "actions" }, [
-      el("button", { type: "submit", class: "btn" }, "Ajouter"),
-      el("button", { type: "button", class: "btn secondary", onclick: closeModal }, "Annuler"),
-    ]),
-  ]);
 
-  const helpers = el("details", { style: "margin:0 16px 4px" }, [
-    el("summary", { style: "cursor:pointer;color:var(--accent);font-size:13.5px;padding:8px 0" },
-      "Je ne connais pas l'adresse de ma camera : la trouver automatiquement"),
-    brandWidget,
-    onvifWidget,
-  ]);
+    return container;
+  }
+
+  function renderStep2() {
+    const typeSelect = buildSourceTypeSelect();
+    typeSelect.value = state.sourceType;
+    const urlInput = el("input", { type: "text", value: state.url });
+    const resultEl = el("div", { style: "margin-top:10px" });
+    const testBtn = el("button", { type: "button", class: "btn secondary" }, "Tester la connexion");
+
+    function renderResult() {
+      resultEl.innerHTML = "";
+      if (state.testing) {
+        resultEl.appendChild(el("div", { class: "hint" }, "Test en cours..."));
+      } else if (state.testResult) {
+        if (state.testResult.ok) {
+          const res = state.testResult.resolution ? ` (${state.testResult.resolution})` : "";
+          resultEl.appendChild(el("div", { style: "color:var(--ok)" }, `Connexion reussie${res}`));
+        } else {
+          resultEl.appendChild(el("div", { class: "error-msg" }, state.testResult.detail || "Echec de connexion"));
+        }
+      }
+    }
+    renderResult();
+
+    testBtn.addEventListener("click", async () => {
+      if (!urlInput.value.trim()) { toast("L'adresse est requise"); return; }
+      state.testing = true; state.testResult = null; testBtn.disabled = true;
+      renderResult();
+      try {
+        state.testResult = await apiJson("/api/cameras/test-connection", {
+          method: "POST",
+          body: JSON.stringify({ source_type: typeSelect.value, url: urlInput.value.trim() }),
+        });
+      } catch (e) {
+        state.testResult = { ok: false, detail: e.message };
+      }
+      state.testing = false; testBtn.disabled = false;
+      renderResult();
+    });
+
+    return el("div", {}, [
+      el("div", {}, [el("label", {}, "Type de connexion"), typeSelect]),
+      el("div", { style: "margin-top:10px" }, [el("label", {}, "Adresse de la camera"), urlInput]),
+      testBtn,
+      resultEl,
+      el("div", { class: "hint", style: "margin-top:10px" },
+        "Vous pouvez continuer meme sans test reussi, mais la camera restera hors ligne tant que l'adresse n'est pas correcte."),
+      el("div", { class: "actions", style: "margin-top:14px" }, [
+        el("button", { type: "button", class: "btn", onclick: () => {
+          if (!urlInput.value.trim()) { toast("L'adresse est requise"); return; }
+          state.url = urlInput.value.trim();
+          state.sourceType = typeSelect.value;
+          setStep(3);
+        }}, "Continuer"),
+        el("button", { type: "button", class: "btn secondary", onclick: () => setStep(1) }, "Precedent"),
+      ]),
+    ]);
+  }
+
+  function renderStep3() {
+    const errorEl = el("div", { class: "error-msg" });
+    const nameInput = el("input", { type: "text", value: state.name, required: "" });
+    const recordCheckbox = el("input", { type: "checkbox" });
+    recordCheckbox.checked = state.record;
+
+    const liveUrlInput = el("input", { type: "text", value: state.liveUrl, placeholder: "(optionnel)" });
+    const liveUrlDetails = el("details", {}, [
+      el("summary", { style: "cursor:pointer;color:var(--accent);font-size:13px" },
+        "Adresse additionnelle pour le direct, en qualite reduite (optionnel)"),
+      el("div", { style: "margin-top:6px" }, [liveUrlInput]),
+    ]);
+    if (state.liveUrl) liveUrlDetails.setAttribute("open", "");
+
+    return el("form", { class: "form-grid", onsubmit: async (ev) => {
+      ev.preventDefault();
+      errorEl.textContent = "";
+      try {
+        await apiJson("/api/cameras", {
+          method: "POST",
+          body: JSON.stringify({
+            name: nameInput.value,
+            source_type: state.sourceType,
+            url: state.url,
+            live_url: liveUrlInput.value || null,
+            record: recordCheckbox.checked,
+          }),
+        });
+        closeModal();
+        await loadCameras();
+        toast("Camera ajoutee");
+      } catch (e) {
+        errorEl.textContent = e.message;
+      }
+    }}, [
+      el("div", {}, [el("label", {}, "Nom"), nameInput,
+        el("div", { class: "hint" }, "Un nom pour la reconnaitre facilement, ex. \"Entree\" ou \"Jardin\".")]),
+      el("div", { class: "checkbox-row" }, [recordCheckbox, el("label", {}, "Enregistrer en continu sur le disque")]),
+      liveUrlDetails,
+      el("div", { class: "hint" }, "Les reglages plus avances (zoom motorise, detection de mouvement, economie de donnees...) se configurent ensuite sur la page de la camera - vous pourrez y revenir a tout moment."),
+      errorEl,
+      el("div", { class: "actions" }, [
+        el("button", { type: "submit", class: "btn" }, "Ajouter la camera"),
+        el("button", { type: "button", class: "btn secondary", onclick: () => setStep(2) }, "Precedent"),
+      ]),
+    ]);
+  }
+
+  function render() {
+    stepLabelEl.textContent = `Etape ${state.step} / 3`;
+    modalBody.innerHTML = "";
+    if (state.step === 1) modalBody.appendChild(renderStep1());
+    else if (state.step === 2) modalBody.appendChild(renderStep2());
+    else modalBody.appendChild(renderStep3());
+  }
 
   root.appendChild(el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === e.currentTarget) closeModal(); } }, [
     el("div", { class: "modal" }, [
@@ -263,10 +399,12 @@ function openAddModal() {
         el("h2", {}, "Ajouter une camera"),
         el("button", { class: "close-btn", onclick: closeModal }, "×"),
       ]),
-      helpers,
-      form,
+      stepLabelEl,
+      modalBody,
     ]),
   ]));
+
+  render();
 }
 
 document.getElementById("btn-add").addEventListener("click", openAddModal);
