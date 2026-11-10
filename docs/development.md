@@ -65,10 +65,12 @@ docker compose up -d --build
 ```
 
 **Revenir à la version précédente** si une mise à jour pose problème -
-listez d'abord les versions disponibles, puis basculez dessus :
+listez d'abord les derniers changements pour repérer un identifiant de
+version (la colonne de gauche, ex. `a458501`) antérieur au problème,
+puis basculez dessus :
 ```bash
-git tag -l                          # liste les versions reperees
-git checkout v1.0.0                 # remplacez par la version voulue
+git log --oneline -10               # affiche les 10 derniers changements
+git checkout a458501                # remplacez par l'identifiant voulu
 docker compose up -d --build
 ```
 
