@@ -124,3 +124,9 @@ Le reste de la documentation est rangé par thème dans `docs/` :
 - **[Développement](docs/development.md)** — structure du dépôt, mise à
   jour et retour en arrière, robustesse et limites connues, tests,
   dépannage.
+
+Vous avez plusieurs boîtiers NVR ? **[nvr-directory/](nvr-directory/README.md)**
+est une petite application séparée - à déployer sur sa propre machine, pas
+sur un boîtier NVR - qui liste tous vos boîtiers avec leur état en ligne/hors
+ligne, partagée sur tous vos appareils et toujours joignable même si tous
+vos NVR sont hors ligne en même temps.

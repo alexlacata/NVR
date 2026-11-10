@@ -1,0 +1,35 @@
+services:
+  nvr-directory:
+    build: .
+    container_name: nvr-directory
+    restart: unless-stopped
+    environment:
+      DIRECTORY_PASSWORD: ${DIRECTORY_PASSWORD:?definissez un mot de passe dans .env}
+    volumes:
+      - ./data:/data
+    expose:
+      - "8000"
+
+  # Caddy obtient et renouvelle automatiquement un certificat HTTPS
+  # (Let's Encrypt) pour DIRECTORY_DOMAIN, tant que ce nom de domaine
+  # pointe bien vers l'adresse IP publique de cette machine et que les
+  # ports 80/443 sont ouverts (voir README.md de ce dossier).
+  caddy:
+    image: caddy:2-alpine
+    container_name: nvr-directory-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DIRECTORY_DOMAIN: ${DIRECTORY_DOMAIN:?definissez votre nom de domaine dans .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - nvr-directory
+
+volumes:
+  caddy_data:
+  caddy_config:

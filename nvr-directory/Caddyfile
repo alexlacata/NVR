@@ -1,0 +1,3 @@
+{$DIRECTORY_DOMAIN} {
+	reverse_proxy nvr-directory:8000
+}
