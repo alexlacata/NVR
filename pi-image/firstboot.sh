@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Turns a fresh Raspberry Pi OS Lite (64-bit) boot - flashed directly onto
-# an SSD/HDD with Raspberry Pi Imager, see README "Creer une image prete a
-# flasher" - into a running NVR that comes back up on every reboot.
+# an SSD/HDD with Raspberry Pi Imager, see docs/installation.md "Creer une
+# image prete a flasher" - into a running NVR that comes back up on every
+# reboot.
 #
 # Usage (on the Pi, over SSH, as the user created by Raspberry Pi Imager) -
 # no arguments needed, the repo/branch below are baked in:
@@ -94,7 +95,7 @@ log 5 "Acces a l'encodeur video materiel (si present)"
 # Raspberry Pi 4 et anterieurs seulement - le Pi 5 n'a plus ce bloc
 # materiel (decodage uniquement) et n'aura simplement aucun /dev/video*
 # "codec" ici, ce qui est normal : le serveur retombe alors tout seul sur
-# l'encodage logiciel (voir NVR_HW_ENCODER dans le README). Un override
+# l'encodage logiciel (voir NVR_HW_ENCODER dans docs/installation.md). Un override
 # Docker Compose separe plutot qu'edit direct de docker-compose.yml, pour
 # rester idempotent et ne jamais entrer en conflit avec une mise a jour du
 # fichier suivi par git.

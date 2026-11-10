@@ -14,11 +14,11 @@ services:
       # Mettez a true si NVR_DISK_PATH ci-dessous est un partage reseau
       # monte (ex. disque sur le port USB d'un Peplink) : le service
       # refuse alors de demarrer tant que le montage n'est pas pret, au
-      # lieu de recreer silencieusement le dossier en local. Voir le
-      # README, section "Ou brancher le disque dur ?".
+      # lieu de recreer silencieusement le dossier en local. Voir
+      # docs/network-access.md, section "Ou brancher le disque dur ?".
       NVR_REQUIRE_EXISTING_DATA_DIR: ${NVR_REQUIRE_EXISTING_DATA_DIR:-false}
-      # Encodeur video materiel (Raspberry Pi 4 et anterieurs - voir le
-      # README, section "Optimisations Raspberry Pi"). "auto" (defaut) le
+      # Encodeur video materiel (Raspberry Pi 4 et anterieurs - voir
+      # docs/installation.md, section "Optimisations Raspberry Pi"). "auto" (defaut) le
       # detecte au demarrage et retombe sur le logiciel s'il est absent
       # (toujours le cas sur PC/serveur x86, et sur Pi 5).
       NVR_HW_ENCODER: ${NVR_HW_ENCODER:-auto}

@@ -4,8 +4,8 @@
 # reverse proxy in front of it. Browsers will show a "not private"
 # warning to click through (self-signed certs aren't trusted by default),
 # which is expected; for a real public domain, prefer a reverse proxy
-# with Let's Encrypt instead (see the README's "Regarder depuis le
-# telephone" section).
+# with Let's Encrypt instead (see docs/network-access.md's "Regarder
+# depuis le telephone" section).
 set -euo pipefail
 
 DATA_DIR="${NVR_DATA_DIR:-data}"
