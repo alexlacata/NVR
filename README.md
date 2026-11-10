@@ -121,5 +121,6 @@ Le reste de la documentation est rangé par thème dans `docs/` :
 - **[Accès réseau](docs/network-access.md)** — HTTPS, usage depuis le
   téléphone, annuaire multi-boîtiers ("Mes systèmes"), déploiement derrière
   un routeur 4G/5G.
-- **[Développement](docs/development.md)** — structure du dépôt, robustesse
-  et limites connues, tests, dépannage.
+- **[Développement](docs/development.md)** — structure du dépôt, mise à
+  jour et retour en arrière, robustesse et limites connues, tests,
+  dépannage.

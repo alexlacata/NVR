@@ -48,6 +48,45 @@ pi-image/
   tests.yml               integration continue : lance la suite de tests sur chaque push/pull request
 ```
 
+## Mettre à jour / revenir en arrière
+
+Appliquer une mise à jour et revenir à la version précédente passent par
+la même opération simple (`git checkout` + reconstruction) - jamais par
+une modification manuelle de fichiers, ce qui garantit que chaque
+changement reste isolé et réversible plutôt que de s'accumuler de façon
+incontrôlée.
+
+**Mettre à jour** (sur le Pi, ou toute autre machine qui fait tourner le
+NVR) :
+```bash
+cd ~/nvr   # ou l'emplacement de votre installation
+git pull
+docker compose up -d --build
+```
+
+**Revenir à la version précédente** si une mise à jour pose problème -
+listez d'abord les versions disponibles, puis basculez dessus :
+```bash
+git tag -l                          # liste les versions reperees
+git checkout v1.0.0                 # remplacez par la version voulue
+docker compose up -d --build
+```
+
+Ni la mise à jour ni le retour en arrière ne touchent à vos données
+(caméras, enregistrements, comptes) : elles vivent dans `NVR_DATA_DIR`
+(un volume Docker séparé, jamais versionné avec le code), pas dans le
+dépôt. Un retour en arrière arrête brièvement tous les flux caméra le
+temps de reconstruire le conteneur (quelques secondes), sans aucune
+perte d'enregistrement.
+
+Pour revenir ensuite à la dernière version (sortir du mode "figé" sur un
+ancien tag) :
+```bash
+git checkout claude/nvr-multi-stream-gateway-fzb8xm
+git pull
+docker compose up -d --build
+```
+
 ## Robustesse et limites connues
 
 Quelques points à avoir en tête pour un usage réel, au-delà de ce que le
