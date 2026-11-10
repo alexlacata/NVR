@@ -5,7 +5,10 @@
 ```
 app/
   config.py          configuration (variables d'environnement + surcharges runtime)
-  models.py           modèles de données (Camera, User, réglages runtime, ...)
+  models/             modèles de données, un fichier par domaine (camera.py, user.py,
+                        settings.py, systems.py, notifications.py, router_credentials.py) -
+                        app/models/__init__.py réexporte tout, donc `from app.models import X`
+                        marche partout ailleurs sans changement
   store.py            persistance des caméras (YAML)
   user_store.py         persistance des comptes utilisateurs (YAML, mots de passe hachés)
   settings_store.py      persistance des réglages serveur modifiables depuis l'UI (YAML)
