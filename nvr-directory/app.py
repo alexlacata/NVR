@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -24,7 +25,7 @@ import yaml
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 DATA_DIR = Path(os.environ.get("DIRECTORY_DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "systems.yml"
@@ -43,7 +44,11 @@ SESSION_TTL_SECONDS = 30 * 24 * 3600  # 30 jours
 _sessions: dict[str, float] = {}
 
 # Anti-bruteforce par adresse IP : ce service est expose sur internet,
-# contrairement au NVR qui vit derriere un reseau local.
+# contrairement au NVR qui vit derriere un reseau local. L'adresse du
+# visiteur n'est la bonne que si uvicorn fait confiance aux en-tetes du
+# proxy (--proxy-headers, voir Dockerfile) : sans cela toutes les
+# requetes semblent venir de Caddy et un seul attaquant bloque tout le
+# monde, proprietaire compris.
 MAX_ATTEMPTS = 5
 LOCKOUT_SECONDS = 300
 _failed_attempts: dict[str, list[float]] = {}
@@ -61,10 +66,16 @@ def _is_locked_out(ip: str) -> bool:
 
 
 def _record_failed_attempt(ip: str) -> None:
-    _failed_attempts.setdefault(ip, []).append(time.time())
+    now = time.time()
+    for other in [k for k, v in _failed_attempts.items() if not v or now - v[-1] >= LOCKOUT_SECONDS]:
+        del _failed_attempts[other]
+    _failed_attempts.setdefault(ip, []).append(now)
 
 
 def _create_session() -> str:
+    now = time.time()
+    for expired in [t for t, expiry in _sessions.items() if expiry < now]:
+        del _sessions[expired]
     token = secrets.token_urlsafe(32)
     _sessions[token] = time.time() + SESSION_TTL_SECONDS
     return token
@@ -87,6 +98,12 @@ def require_session(session: Optional[str] = Cookie(default=None)) -> None:
         raise HTTPException(status_code=401, detail="Non authentifie")
 
 
+# Les routes synchrones tournent dans un pool de threads : sans verrou,
+# deux modifications simultanees (telephone + ordinateur) liraient la meme
+# liste et la seconde ecriture effacerait la premiere.
+_store_lock = threading.Lock()
+
+
 def _load_systems() -> list[dict]:
     if not DATA_FILE.exists():
         return []
@@ -103,16 +120,34 @@ def _save_systems(systems: list[dict]) -> None:
     tmp.replace(DATA_FILE)
 
 
+def _validate_url(v: Optional[str]) -> Optional[str]:
+    # L'adresse finit dans un lien cliquable : n'accepter que http(s)
+    # ecarte les schemas executables par le navigateur (javascript:...).
+    if v is None:
+        return v
+    v = v.strip()
+    if "://" not in v:
+        # Adresse nue ("192.168.1.2:8000"), ce qu'on tape naturellement.
+        v = "http://" + v
+    if not v.lower().startswith(("http://", "https://")):
+        raise ValueError("L'adresse doit commencer par http:// ou https://")
+    return v
+
+
 class SystemCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     url: str = Field(min_length=1, max_length=500)
     notes: str = Field(default="", max_length=500)
+
+    _check_url = field_validator("url")(_validate_url)
 
 
 class SystemUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     url: Optional[str] = Field(default=None, min_length=1, max_length=500)
     notes: Optional[str] = Field(default=None, max_length=500)
+
+    _check_url = field_validator("url")(_validate_url)
 
 
 class LoginRequest(BaseModel):
@@ -130,6 +165,7 @@ def login(payload: LoginRequest, request: Request, response: Response):
     if not secrets.compare_digest(payload.password, PASSWORD):
         _record_failed_attempt(ip)
         raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    _failed_attempts.pop(ip, None)
     token = _create_session()
     response.set_cookie(
         "session",
@@ -162,31 +198,34 @@ def list_systems():
 
 @app.post("/api/systems", dependencies=[Depends(require_session)])
 def create_system(payload: SystemCreate):
-    systems = _load_systems()
     new = {"id": uuid.uuid4().hex[:12], **payload.model_dump()}
-    systems.append(new)
-    _save_systems(systems)
+    with _store_lock:
+        systems = _load_systems()
+        systems.append(new)
+        _save_systems(systems)
     return new
 
 
 @app.patch("/api/systems/{system_id}", dependencies=[Depends(require_session)])
 def update_system(system_id: str, payload: SystemUpdate):
-    systems = _load_systems()
-    for system in systems:
-        if system["id"] == system_id:
-            system.update({k: v for k, v in payload.model_dump().items() if v is not None})
-            _save_systems(systems)
-            return system
+    with _store_lock:
+        systems = _load_systems()
+        for system in systems:
+            if system["id"] == system_id:
+                system.update({k: v for k, v in payload.model_dump().items() if v is not None})
+                _save_systems(systems)
+                return system
     raise HTTPException(status_code=404, detail="Systeme introuvable")
 
 
 @app.delete("/api/systems/{system_id}", dependencies=[Depends(require_session)])
 def delete_system(system_id: str):
-    systems = _load_systems()
-    remaining = [s for s in systems if s["id"] != system_id]
-    if len(remaining) == len(systems):
-        raise HTTPException(status_code=404, detail="Systeme introuvable")
-    _save_systems(remaining)
+    with _store_lock:
+        systems = _load_systems()
+        remaining = [s for s in systems if s["id"] != system_id]
+        if len(remaining) == len(systems):
+            raise HTTPException(status_code=404, detail="Systeme introuvable")
+        _save_systems(remaining)
     return {"ok": True}
 
 

@@ -208,7 +208,11 @@
     var body = null;
     try { body = await res.json(); } catch (e) {}
     if (!res.ok) {
-      throw new Error((body && body.detail) || "Erreur (" + res.status + ")");
+      var detail = body && body.detail;
+      if (Array.isArray(detail)) {
+        detail = detail.map(function (d) { return String(d.msg || "").replace(/^Value error, /, ""); }).join(" ");
+      }
+      throw new Error(detail || "Erreur (" + res.status + ")");
     }
     return body;
   }
@@ -300,7 +304,7 @@
       '<div class="field"><label for="f-name">Nom</label>' +
       '<input id="f-name" maxlength="100" placeholder="Ex. Maison, Garage, Chalet…"></div>' +
       '<div class="field"><label for="f-url">Adresse (URL)</label>' +
-      '<input id="f-url" maxlength="500" placeholder="https://mon-nvr.exemple.com ou http://100.x.x.x:8000"></div>' +
+      '<input id="f-url" maxlength="500" placeholder="192.168.1.2:8000 ou https://mon-nvr.exemple.com"></div>' +
       '<div id="f-url-err" class="field-err" style="display:none"></div>' +
       '<div class="field"><label for="f-notes">Notes (optionnel)</label>' +
       '<textarea id="f-notes" rows="2" maxlength="300" placeholder="Emplacement, identifiant Tailscale…"></textarea></div>' +
@@ -332,12 +336,7 @@
       urlErr.style.display = "none";
 
       if (!name) { nameInput.focus(); return; }
-      if (!url || !/^https?:\/\//i.test(url)) {
-        urlErr.textContent = "L'adresse doit commencer par http:// ou https://";
-        urlErr.style.display = "block";
-        urlInput.focus();
-        return;
-      }
+      if (!url) { urlInput.focus(); return; }
 
       saveBtn.disabled = true;
       saveBtn.textContent = "Enregistrement…";
@@ -359,7 +358,7 @@
       } catch (err) {
         saveBtn.disabled = false;
         saveBtn.textContent = "Enregistrer";
-        urlErr.textContent = "Échec de l'enregistrement : " + err.message;
+        urlErr.textContent = err.message;
         urlErr.style.display = "block";
       }
     });
@@ -394,13 +393,20 @@
 
   async function loadSystems() {
     contentEl.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement…</div>';
-    var prevIds = systems.map(function (s) { return s.id; });
+    var prevUrls = {};
+    systems.forEach(function (s) { prevUrls[s.id] = s.url; });
     systems = await api("/api/systems");
-    var newIds = systems.map(function (s) { return s.id; });
-    var changed = prevIds.length !== newIds.length || newIds.some(function (id) { return prevIds.indexOf(id) === -1; });
+    var changed = systems.length !== Object.keys(prevUrls).length ||
+      systems.some(function (s) { return prevUrls[s.id] !== s.url; });
     systems.forEach(function (s) { if (!(s.id in statusMap)) statusMap[s.id] = "checking"; });
     render();
     if (changed) checkAll();
+  }
+
+  var autoCheckTimer = null;
+  function startAutoCheck() {
+    if (autoCheckTimer) return;
+    autoCheckTimer = setInterval(function () { if (systems.length) checkAll(); }, 30000);
   }
 
   function showLogin() {
@@ -439,7 +445,7 @@
       pwdInput.value = "";
       showApp();
       await loadSystems();
-      setInterval(function () { if (systems.length) checkAll(); }, 30000);
+      startAutoCheck();
     } catch (err) {
       errEl.textContent = err.message;
       errEl.style.display = "block";
@@ -451,7 +457,7 @@
     if (status.authenticated) {
       showApp();
       await loadSystems();
-      setInterval(function () { if (systems.length) checkAll(); }, 30000);
+      startAutoCheck();
     } else {
       showLogin();
     }

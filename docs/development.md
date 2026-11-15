@@ -42,6 +42,9 @@ app/
     icons/                icones de l'app (favicon, apple-touch-icon, icones PWA)
     js/qrcode.min.js       generateur de QR code cote client (vendored, sans dependance externe)
 tests/                 tests automatisés (pytest)
+nvr-directory/         annuaire multi-boîtiers : service séparé, déployé sur sa propre machine
+                         (son propre Dockerfile/docker-compose, ses propres tests) - n'importe
+                         rien de app/ et app/ n'en importe rien
 scripts/
   account-recovery.py     recuperation hors ligne d'un compte (mot de passe/2FA/role) sans acces admin
   generate-self-signed-cert.sh  generation d'un certificat auto-signe pour le HTTPS natif
